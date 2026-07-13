@@ -168,6 +168,7 @@
   }
   .btn.primary:active{background:rgba(224,54,44,.4);}
   .btn.ghost{border-color:rgba(167,159,146,.18); color:var(--dim); font-size:12px; padding:10px 0;}
+  #bResume.hidden{display:none;} /* caché = ne réserve plus d'espace dans le menu */
   .best{font-size:12px; letter-spacing:.2em; color:var(--dim); text-transform:uppercase; font-variant-numeric:tabular-nums;}
   #over{background:rgba(3,3,6,.45);} /* laisse voir le sang qui coule derrière */
   #over h2, #over #oStats{text-shadow:0 1px 10px #000;}
@@ -1570,18 +1571,31 @@ function beginWave(n){
   game.wave = n; game.cleared = false;
   saveRun();
   if(n>=20){
-    // LA HORDE : vingt zombies épaule contre épaule, marche inexorable
+    // LA HORDE : une meute mélangée qui arrive de loin, marche inexorable
     game.queue = 0;
     showMsg('LA HORDE', 3000, true);
-    showSub('Vingt zombies, épaule contre épaule. Abats-les tous — la moindre erreur sera la dernière.', 4200);
-    for(let i=0;i<20;i++){
+    showSub('Vingt zombies, dix chauves-souris, cinq loups. Abats-les tous — la moindre erreur sera la dernière.', 4400);
+    const pack = [];
+    for(let i=0;i<20;i++) pack.push('walker');
+    for(let i=0;i<10;i++) pack.push('flyer');
+    for(let i=0;i<5;i++)  pack.push('crawler');
+    for(let i=pack.length-1;i>0;i--){   // mélange
+      const j = Math.floor(Math.random()*(i+1));
+      const tmp = pack[i]; pack[i] = pack[j]; pack[j] = tmp;
+    }
+    const SPD = {walker:0.38, flyer:0.34, crawler:0.3};
+    for(let i=0;i<pack.length;i++){
+      const ty = pack[i];
       const m = new Monster({
-        az: wrapDeg(game.homeYaw - 57 + i*6),
-        dist: 20 + (i%3)*2.2,
-        type:'walker', speed:0.38
+        az: wrapDeg(game.homeYaw - 75 + i*(150/(pack.length-1)) + rand(-2,2)),
+        dist: 24 + rand(0,10),
+        type: ty, speed: SPD[ty]
       });
       m.horde = true; m.aggro = true; m.alerted = true;
-      if(m.voice.ok) m.voice.grG.gain.value *= 0.35;
+      if(m.voice.ok){
+        m.voice.grG.gain.value *= 0.3;
+        m.voice.pan.panningModel = 'equalpower';   // 35 sources : panning allégé
+      }
       game.monsters.push(m);
     }
     AU.boom();

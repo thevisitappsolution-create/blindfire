@@ -72,8 +72,9 @@ Espace ou clic sur le bouton pour tirer.
 - **Reprise de partie** : après 10 minutes de jeu cumulées, un bouton « Reprendre —
   vague N » apparaît au menu et restaure la vague, le score et les vies
   sauvegardés à chaque début de vague (localStorage).
-- **Fin de partie : LA HORDE (vague 20)** : vingt zombies épaule contre épaule en
-  marche inexorable ; les abattre tous = victoire (+500 pts, +2000 pièces).
+- **Fin de partie : LA HORDE (vague 20)** : 20 zombies + 10 chauves-souris +
+  5 loups mélangés, arrivant de loin (24-34 m) en marche inexorable ; les abattre
+  tous = victoire (+500 pts, +2000 pièces).
 - **Économie (bêta, 100 % virtuelle)** : boutique d'armes 2/3/4/5 coups
   (200/400/600/1000 pièces — plus de coups = rechargement plus long), bonus de
   vies 24 h / 7 j, coffre toutes les 10 min de jeu (50-150 pièces, barre de
