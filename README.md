@@ -57,10 +57,16 @@ Espace ou clic sur le bouton pour tirer.
   trop lourd) ; ils sont compressés en `.m4a` dans `docs/sons/` (ffmpeg, AAC 96k)
   et chargés par la version GitHub Pages — ambiance en boucle de 96 s et son de
   début de partie. La version artifact garde l'ambiance synthétique en repli.
-- **Bestiaire crescendo** : marcheurs, quadrupèdes au sol (vague 2+), volants en
+- **Bestiaire crescendo** : zombies (sprite fourni dans `Sons/Monstre`, détouré
+  et pré-assombri en 9 niveaux), quadrupèdes au sol (vague 2+), volants en
   zigzag (4+), araignées à 6 pattes qui descendent du plafond (5+), hydres à
-  3 têtes — chaque tête doit être détruite (6+), téléporteurs (8+ : il change de
+  2 têtes — chaque tête doit être détruite (6+), téléporteurs (8+ : il change de
   couleur, la seconde d'après il a bougé).
+- **3 vies** : être dévoré coûte une vie et relance la vague en cours ; les trois
+  perdues, on repart de zéro.
+- **Reprise de partie** : après 10 minutes de jeu cumulées, un bouton « Reprendre —
+  vague N » apparaît au menu et restaure la vague, le score et les vies
+  sauvegardés à chaque début de vague (localStorage).
 - **Lumière = vitesse** : à luminosité maximale, toutes les créatures foncent à
   leur vitesse max. Et leurs yeux brillent d'autant plus qu'il fait sombre
   (l'inverse en pleine lumière).

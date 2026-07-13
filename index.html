@@ -30,6 +30,7 @@
     font-size:13px; letter-spacing:.32em; text-transform:uppercase; color:var(--dim);
   }
   #hScore{font-variant-numeric:tabular-nums; color:var(--bone);}
+  #hLives{color:var(--blood); font-size:15px; letter-spacing:.14em; text-indent:.14em;}
   #meter{
     position:absolute; right:12px; top:50%; transform:translateY(-50%);
     width:4px; height:30vh; background:rgba(167,159,146,.12); border-radius:2px;
@@ -203,6 +204,7 @@
   <div id="hud" class="hidden">
     <div id="hudTop">
       <div id="hWave" class="hudlab"></div>
+      <div id="hLives" class="hudlab"></div>
       <div id="hScore" class="hudlab">0</div>
     </div>
     <div id="meter"><div id="meterFill"></div></div>
@@ -235,13 +237,14 @@
     <p class="tag">Tes yeux mentent. Tes oreilles, jamais.</p>
     <div class="ear">&#127911; Écouteurs indispensables&nbsp;— ici, le son est ta vision.</div>
     <button id="bPlay" class="btn primary">Jouer</button>
+    <button id="bResume" class="btn hidden">Reprendre</button>
     <button id="bTuto" class="btn">Tutoriel</button>
     <button id="bTest" class="btn ghost">Test audio (casque)</button>
     <label class="opt"><input type="checkbox" id="optFlash"> Flashs réduits (photosensibilité)</label>
     <div id="mBest" class="best"></div>
     <div id="mCtl"></div>
     <div class="foot">
-      BLINDFIRE v0.10 · prototype solo «&nbsp;Survie&nbsp;»<br>
+      BLINDFIRE v0.11 · prototype solo «&nbsp;Survie&nbsp;»<br>
       Astuce iPhone&nbsp;: Partager&nbsp;→ «&nbsp;Sur l’écran d’accueil&nbsp;» pour jouer en plein écran.
     </div>
   </div>
@@ -311,7 +314,8 @@ function angDiff(a,b){ let d = wrapDeg(a-b); return d>180 ? d-360 : d; }
 
 const store = {
   get(k){ try{ return localStorage.getItem(k); }catch(e){ return null; } },
-  set(k,v){ try{ localStorage.setItem(k,v); }catch(e){} }
+  set(k,v){ try{ localStorage.setItem(k,v); }catch(e){} },
+  del(k){ try{ localStorage.removeItem(k); }catch(e){} }
 };
 
 const EYE = 1.5;            // hauteur des yeux du joueur (m)
@@ -697,7 +701,7 @@ const BEAST_INTRO = {
   crawler:'Quelque chose rampe au sol… vise bas.',
   flyer:'Des ailes fendent l’air en zigzag…',
   spider:'Ça descend du plafond… vise haut.',
-  hydra:'Plusieurs têtes. Détruis-les toutes.',
+  hydra:'Deux têtes. Abats les deux.',
 };
 
 // voix spatialisée d'un monstre
@@ -831,7 +835,7 @@ class Monster {
     this.walkSpeed = (opts.speed!=null ? opts.speed
       : Math.min(2.6, 1.05 + game.wave*0.11 + rand(0,0.15))) * B.spd;
     this.stepKind = B.step;
-    this.heads = this.type==='hydra' ? [true,true,true] : null;
+    this.heads = this.type==='hydra' ? [true,true] : null;
     this.fh = 1.7;   // altitude du volant
     this.sh = 3.0;   // hauteur de l'araignée (descend du plafond)
     this.zig = this.type==='flyer' || (game.wave>=6 && this.type==='walker' && Math.random()<0.4);
@@ -938,12 +942,12 @@ class Monster {
     let heads;
     if(this.type==='hydra'){
       heads = [];
-      const off = [-0.28, 0, 0.28], hy = [1.5, 1.58, 1.5];
-      for(let i=0;i<3;i++) if(this.heads[i]) heads.push({i:i, dx:off[i], h:hy[i], r:0.3});
+      const off = [-0.18, 0.18], hy = [1.54, 1.54];
+      for(let i=0;i<this.heads.length;i++) if(this.heads[i]) heads.push({i:i, dx:off[i], h:hy[i], r:0.3});
     }else if(this.type==='crawler') heads = [{i:0, dx:0, h:0.75, r:0.3}];
     else if(this.type==='flyer')    heads = [{i:0, dx:0, h:this.fh, r:0.32}];
     else if(this.type==='spider')   heads = [{i:0, dx:0, h:this.sh, r:0.34}];
-    else heads = [{i:0, dx:0, h:1.56, r:0.34}];
+    else heads = [{i:0, dx:0, h:(this.type==='walker' && SPRITE.ok) ? 1.66 : 1.56, r:0.34}];
     for(const hd of heads){
       const rr = Math.max(2.3, ang(hd.r));
       if(Math.abs(dy - ang(hd.dx))<=rr && Math.abs(view.pitch - elev(hd.h))<=rr){
@@ -1009,7 +1013,7 @@ const game = {
   wave:0, score:0, kills:0,
   best:+(store.get('bf_best')||0),
   monsters:[], queue:0, nextSpawn:0, waveBreakT:0, cleared:false,
-  effLight:0, dyingM:null, dyingT:0, aimZone:null, homeYaw:0,
+  effLight:0, dyingM:null, dyingT:0, aimZone:null, homeYaw:0, lives:3,
 };
 const tuto = {step:0, t:0, prog:0, az:0};
 const view = {yaw:0, pitch:-34};
@@ -1026,6 +1030,30 @@ let reducedFlash = false;
 // particules de poussière (pseudo-3D)
 const dust = [];
 for(let i=0;i<44;i++) dust.push({az:rand(0,360), d:rand(0.8,6), h:rand(0.1,2.3), vh:rand(-0.05,0.08), va:rand(-3,3)});
+
+// sprite du marcheur : le zombie fourni dans Sons/Monstre, servi depuis monstres/
+// (pré-teinté en 9 niveaux d'obscurité ; repli silhouette dessinée si absent)
+const SPRITE = {ok:false, levels:[], aspect:0.82};
+(function(){
+  const im = new Image();
+  im.onload = () => {
+    SPRITE.aspect = im.width/im.height;
+    const HL = 720, WL = Math.max(1, Math.round(HL*SPRITE.aspect));
+    for(let i=0;i<9;i++){
+      const cnv = document.createElement('canvas');
+      cnv.width = WL; cnv.height = HL;
+      const c2 = cnv.getContext('2d');
+      c2.drawImage(im, 0, 0, WL, HL);
+      c2.globalCompositeOperation = 'source-atop';
+      c2.fillStyle = 'rgba(0,0,0,'+(1 - i/8).toFixed(3)+')';
+      c2.fillRect(0, 0, WL, HL);
+      SPRITE.levels.push(cnv);
+    }
+    SPRITE.ok = true;
+  };
+  im.onerror = () => {};
+  im.src = 'monstres/zombie.webp';
+})();
 
 // gouttes de sang sur l'écran (quand on se fait dévorer)
 const blood = [];
@@ -1152,6 +1180,7 @@ function resetRun(){
   game.score = 0; game.kills = 0; game.wave = 0;
   game.queue = 0; game.waveBreakT = 0; game.dyingM = null;
   game.seenTypes = {};
+  game.lives = 3;
   blood.length = 0;
   loaded = true; reloadT = 0; flash = 0; recoil = 0; shake = 0; timeScale = 1;
   hb.next = T + 0.6;
@@ -1195,16 +1224,44 @@ function spawnTyped(){
   }
 }
 
-function startSurvival(){
+// sauvegarde : dès 10 min de jeu cumulées, on peut reprendre à sa vague
+let ptime = +(store.get('bf_ptime')||0);
+let ptimeFlush = 0;
+function loadRun(){
+  try{
+    const r = JSON.parse(store.get('bf_run')||'null');
+    return (r && r.wave>=2) ? r : null;
+  }catch(e){ return null; }
+}
+function saveRun(){
+  store.set('bf_run', JSON.stringify({
+    wave:game.wave, score:game.score, kills:game.kills, lives:game.lives
+  }));
+}
+function updateResume(){
+  const cp = loadRun(), el = $('bResume');
+  if(cp && ptime>=600){
+    el.textContent = 'Reprendre — vague '+cp.wave;
+    el.classList.remove('hidden');
+  }else el.classList.add('hidden');
+}
+
+function startSurvival(cp){
   resetRun();
   game.state = 'playing';
   game.homeYaw = wrapDeg(Input.yaw + Input.touchYaw);
+  if(cp){
+    game.score = cp.score||0;
+    game.kills = cp.kills||0;
+    game.lives = clamp(cp.lives||3, 1, 3);
+  }
   AU.playStart();
-  beginWave(1);
+  beginWave(cp ? cp.wave : 1);
 }
 function beginWave(n){
   game.wave = n; game.queue = waveCount(n); game.cleared = false;
   game.nextSpawn = T + 1.6;
+  saveRun();
   showMsg('VAGUE '+n, 2000);
   if(n===5) showSub('Ils débordent sur les côtés…', 2600);
   if(n===7) showSub('Ils arrivent de partout. Écoute derrière toi.', 2600);
@@ -1240,11 +1297,27 @@ function finishDeath(){
     setTimeout(()=>{ if(game.state==='tuto') tutoStep(4); }, 2000);
     return;
   }
+  game.lives--;
+  if(game.lives>0){
+    // une vie en moins : la meute se retire, la même vague recommence
+    game.monsters.forEach(m => m.voice.dispose());
+    game.monsters.length = 0;
+    game.dyingM = null;
+    blood.length = 0;
+    game.state = 'playing';
+    game.cleared = true;
+    game.waveBreakT = 3.5;
+    game.wave--;               // la pause relancera la même vague
+    showMsg('VIE PERDUE', 2400, true);
+    showSub('Il te reste '+game.lives+' vie'+(game.lives>1?'s':'')+'. Tiens bon.', 3000);
+    return;
+  }
   gameOver();
 }
 function gameOver(){
   game.monsters.forEach(m => m.voice.dispose());
   game.state = 'over';
+  store.del('bf_run');   // les 3 vies sont perdues : on repart de zéro
   AU.setTension(0);
   const isRec = game.score > game.best;
   if(isRec){ game.best = game.score; store.set('bf_best', game.best); }
@@ -1261,6 +1334,7 @@ function showMenu(){
   game.state = 'menu';
   resetRun();
   elBest.textContent = game.best>0 ? 'Record : '+game.best : '';
+  updateResume();
   elOver.classList.add('hidden');
   elHud.classList.add('hidden');
   elFire.classList.add('hidden');
@@ -1655,6 +1729,18 @@ function drawMonster(m){
     g.stroke();
     g.beginPath(); g.ellipse(0, h+0.08, 0.24, 0.2, 0, 0, TAU); g.fill();
     g.beginPath(); g.arc(0, h-0.12, 0.13, 0, TAU); g.fill();
+  }else if(m.type==='walker' && SPRITE.ok){
+    // zombie illustré, assombri selon la lumière qu'il reçoit
+    const hM = 1.85, wM = hM*SPRITE.aspect;
+    if(tpWarn){
+      g.fillStyle = 'rgba(150,70,220,0.32)';
+      g.beginPath(); g.ellipse(0, 0.95, 0.55, 1.05, 0, 0, TAU); g.fill();
+    }
+    const lvl = SPRITE.levels[Math.round(clamp(br,0,1)*8)];
+    g.rotate(Math.sin(m.phase*TAU)*0.05);
+    g.save(); g.scale(1,-1);
+    g.drawImage(lvl, -wM/2, -hM, wM, hM);
+    g.restore();
   }else{
     // marcheur / hydre : silhouette humanoïde (l'hydre est plus massive)
     const hydra = m.type==='hydra';
@@ -1671,9 +1757,9 @@ function drawMonster(m){
     g.quadraticCurveTo(0.3*wMul, 1.25, 0.17*wMul, 0.92);
     g.closePath(); g.fill();
     if(hydra){
-      const off = [-0.28, 0, 0.28], hy = [1.5, 1.58, 1.5];
+      const off = [-0.18, 0.18], hy = [1.54, 1.54];
       g.lineWidth = 0.06;
-      for(let i=0;i<3;i++){
+      for(let i=0;i<off.length;i++){
         if(m.heads[i]){
           g.beginPath(); g.moveTo(off[i]*0.4, 1.42); g.lineTo(off[i], hy[i]-0.1); g.stroke();
           g.beginPath(); g.arc(off[i], hy[i], 0.125, 0, TAU); g.fill();
@@ -1717,11 +1803,12 @@ function drawMonster(m){
     let eyes;
     if(m.type==='hydra'){
       eyes = [];
-      const off = [-0.28, 0, 0.28], hy = [1.52, 1.6, 1.52];
-      for(let i=0;i<3;i++) if(m.heads[i]) eyes.push({x:off[i]-0.04,h:hy[i]},{x:off[i]+0.04,h:hy[i]});
+      const off = [-0.18, 0.18], hy = [1.56, 1.56];
+      for(let i=0;i<off.length;i++) if(m.heads[i]) eyes.push({x:off[i]-0.04,h:hy[i]},{x:off[i]+0.04,h:hy[i]});
     }else if(m.type==='crawler') eyes=[{x:-0.045,h:0.76},{x:0.045,h:0.76}];
     else if(m.type==='flyer') eyes=[{x:-0.06,h:m.fh+0.03},{x:0.06,h:m.fh+0.03}];
     else if(m.type==='spider') eyes=[{x:-0.09,h:m.sh-0.14},{x:-0.03,h:m.sh-0.09},{x:0.03,h:m.sh-0.09},{x:0.09,h:m.sh-0.14}];
+    else if(m.type==='walker' && SPRITE.ok) eyes=[{x:-0.033,h:1.7},{x:0.033,h:1.7}];
     else eyes=[{x:-0.052,h:1.58},{x:0.052,h:1.58}];
     const r = Math.max(1.3, 0.021*k*(m.type==='spider' ? 0.7 : 1));
     const ec = tpWarn ? '190,120,255' : wind ? '255,70,50' : '255,233,184';
@@ -1790,6 +1877,8 @@ function drawCross(light){
 function hud(light){
   const inGame = game.state==='playing' || game.state==='tuto' || game.state==='dying';
   elDpad.classList.toggle('hidden', !inGame || Input.gyroActive);
+  $('hLives').textContent = (game.state==='playing' || game.state==='dying')
+    ? '♥'.repeat(game.lives) + '♡'.repeat(Math.max(0, 3-game.lives)) : '';
   if(game.state==='playing' || game.state==='dying'){
     elWave.textContent = game.wave>0 ? 'Vague '+game.wave : '';
     elScore.textContent = game.score;
@@ -1816,6 +1905,11 @@ function frame(ts){
   lastTs = ts;
   rdtG = rdt;
   T += rdt;
+  // temps de jeu cumulé (déverrouille la reprise de partie à 10 min)
+  if(game.state==='playing' || game.state==='tuto' || game.state==='dying'){
+    ptime += rdt; ptimeFlush += rdt;
+    if(ptimeFlush>=5){ ptimeFlush = 0; store.set('bf_ptime', Math.round(ptime)); }
+  }
   timeScale += (1-timeScale)*Math.min(1, rdt*5);
   const dt = rdt*timeScale;
 
@@ -1889,7 +1983,9 @@ function launch(mode){
   elCtl.textContent = Input.gyroActive
     ? 'Contrôles : gyroscope ✓ — tourne-toi physiquement pour viser'
     : 'Contrôles : tactile — flèches en bas à gauche ou glisser pour viser';
-  if(mode==='tuto') startTuto(); else startSurvival();
+  if(mode==='tuto') startTuto();
+  else if(mode==='resume') startSurvival(loadRun());
+  else startSurvival();
 }
 function waitForGyro(){
   const t0 = performance.now();
@@ -2000,6 +2096,7 @@ $('bPlay').addEventListener('click', () => {
   begin(store.get('bf_tuto') ? 'surv' : 'tuto');
 });
 $('bTuto').addEventListener('click', () => { AU.ui(); begin('tuto'); });
+$('bResume').addEventListener('click', () => { AU.ui(); begin('resume'); });
 $('bAgain').addEventListener('click', () => { AU.ui(); begin('surv'); });
 $('bMenu').addEventListener('click', () => { AU.ui(); showMenu(); });
 $('bTest').addEventListener('click', () => {
@@ -2015,4 +2112,5 @@ $('optFlash').addEventListener('change', e => { reducedFlash = e.target.checked;
 
 elBest.textContent = game.best>0 ? 'Record : '+game.best : '';
 elCtl.textContent = 'Contrôles : gyroscope (activation à l’écran suivant)';
+updateResume();
 </script>
