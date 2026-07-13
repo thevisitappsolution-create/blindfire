@@ -1079,8 +1079,8 @@ Object.keys(SPRITES).forEach(key => {
   im.onerror = () => {};
   im.src = S.src;
 });
-// cœur en image (dossier vie/) avec repli sur les ♥ texte
-const HEART = {ok:false, src:'vie/coeur.webp'};
+// cœurs en image (fournis dans docs/Vie) avec repli sur les ♥ texte
+const HEART = {ok:false, src:'Vie/coeur.webp', offSrc:'Vie/coeur-vide.webp'};
 (function(){
   const im = new Image();
   im.onload = () => { HEART.ok = true; };
@@ -1954,7 +1954,7 @@ function hud(light){
     if(lv<0) elLivesEl.textContent = '';
     else if(HEART.ok){
       let h = '';
-      for(let i=0;i<3;i++) h += '<img src="'+HEART.src+'"'+(i<lv?'':' class="off"')+' alt="">';
+      for(let i=0;i<3;i++) h += '<img src="'+(i<lv ? HEART.src : HEART.offSrc)+'" alt="">';
       elLivesEl.innerHTML = h;
     }else{
       elLivesEl.textContent = '♥'.repeat(lv) + '♡'.repeat(Math.max(0, 3-lv));
