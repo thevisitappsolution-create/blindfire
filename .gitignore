@@ -1,2 +1,3 @@
-# Sons sources (WAV lourds) — seules les versions compressées de docs/sons/ sont versionnées
-Sons/
+# Sons sources (WAV lourds, > limite GitHub) — racine uniquement ;
+# les versions compressées de docs/sons/ sont bien versionnées
+/Sons/
