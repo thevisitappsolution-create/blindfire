@@ -1622,7 +1622,8 @@ function victory(){
   store.del('bf_run');
   AU.setTension(0);
   game.score += 500;
-  addCoins(2000);
+  const earned = Math.floor(game.score/100);   // 100 points = 1 pièce
+  addCoins(2000 + earned);
   endRunStats(true);
   const isRec = game.score > game.best;
   if(isRec){ game.best = game.score; store.set('bf_best', game.best); }
@@ -1631,7 +1632,7 @@ function victory(){
     'Score : <em>'+game.score+'</em>' + (isRec ? ' <span class="rec">— record !</span>' : '') + '<br>' +
     'Monstres abattus : <em>'+game.kills+'</em><br>' +
     'Précision : <em>'+runPrec()+' %</em> · Réflexe moyen : <em>'+runRefl()+'</em><br>' +
-    'Récompense : <em>+2 000 🪙</em>';
+    'Récompense : <em>+2 000 🪙</em> + score → <em>+'+earned+' 🪙</em>';
   elHud.classList.add('hidden');
   elFire.classList.add('hidden');
   $('win').classList.remove('hidden');
@@ -1684,13 +1685,15 @@ function gameOver(){
   store.del('bf_run');   // les 3 vies sont perdues : on repart de zéro
   AU.setTension(0);
   endRunStats(false);
+  const earned = Math.floor(game.score/100);   // 100 points = 1 pièce
+  if(earned>0) addCoins(earned);
   const isRec = game.score > game.best;
   if(isRec){ game.best = game.score; store.set('bf_best', game.best); }
   elStats.innerHTML =
     'Vague atteinte : <em>'+game.wave+'</em><br>' +
     'Monstres abattus : <em>'+game.kills+'</em><br>' +
     'Précision : <em>'+runPrec()+' %</em> · Réflexe : <em>'+runRefl()+'</em><br>' +
-    'Score : <em>'+game.score+'</em>' +
+    'Score : <em>'+game.score+'</em> → <em>+'+earned+' 🪙</em>' +
     (isRec ? '<br><span class="rec">Nouveau record</span>' : '<br>Record : '+game.best);
   elHud.classList.add('hidden');
   elFire.classList.add('hidden');
