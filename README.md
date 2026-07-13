@@ -50,6 +50,8 @@ Espace ou clic sur le bouton pour tirer.
   5–6 débordement (±135°), 7+ à 360° — annoncé en jeu.
 - **Test auditif gauche/droite** (menu) : trois sons à localiser pour vérifier
   que le casque n'est pas inversé avant de jouer.
+- **Joystick virtuel 8 directions** en mode tactile (gauche/droite/haut/bas +
+  diagonales, branche active illuminée), en plus du glisser-viser.
 - **Munition unique + rechargement** (1,4 s) — le tir raté coûte cher.
 - **Mode Survie** : vagues croissantes, score, record local.
 - **Tutoriel progressif** conforme au PRD : Écoute → Lumière → Tir → Survie.
