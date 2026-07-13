@@ -50,8 +50,13 @@ Espace ou clic sur le bouton pour tirer.
   5–6 débordement (±135°), 7+ à 360° — annoncé en jeu.
 - **Test auditif gauche/droite** (menu) : trois sons à localiser pour vérifier
   que le casque n'est pas inversé avant de jouer.
-- **Joystick virtuel 8 directions** en mode tactile (gauche/droite/haut/bas +
-  diagonales, branche active illuminée), en plus du glisser-viser.
+- **Pavé fléché 8 directions** en mode tactile (haut/bas/gauche/droite +
+  diagonales, maintenir pour pivoter, accélération progressive), en plus du
+  glisser-viser.
+- **Sons personnalisés** : les WAV sources vivent dans `Sons/` (ignoré par git,
+  trop lourd) ; ils sont compressés en `.m4a` dans `docs/sons/` (ffmpeg, AAC 96k)
+  et chargés par la version GitHub Pages — ambiance en boucle de 96 s et son de
+  début de partie. La version artifact garde l'ambiance synthétique en repli.
 - **Bestiaire crescendo** : marcheurs, quadrupèdes au sol (vague 2+), volants en
   zigzag (4+), araignées à 6 pattes qui descendent du plafond (5+), hydres à
   3 têtes — chaque tête doit être détruite (6+), téléporteurs (8+ : il change de

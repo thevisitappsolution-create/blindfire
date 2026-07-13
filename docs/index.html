@@ -97,23 +97,21 @@
   }
   #fire:active #fireDot{transform:scale(.82);}
 
-  /* ---------- Joystick tactile ---------- */
-  #stick{
-    position:absolute; left:calc(22px + env(safe-area-inset-left));
-    bottom:calc(30px + env(safe-area-inset-bottom));
-    width:112px; height:112px; border-radius:50%;
-    border:1px solid rgba(167,159,146,.25); background:rgba(167,159,146,.05);
-    transition:opacity .4s; touch-action:none; z-index:5;
-    -webkit-tap-highlight-color:transparent;
+  /* ---------- Pavé directionnel tactile (8 flèches) ---------- */
+  #dpad{
+    position:absolute; left:calc(18px + env(safe-area-inset-left));
+    bottom:calc(24px + env(safe-area-inset-bottom));
+    display:grid; grid-template-columns:repeat(3,44px); grid-template-rows:repeat(3,44px);
+    gap:5px; transition:opacity .4s; z-index:5; touch-action:none;
   }
-  #stickKnob{
-    position:absolute; left:50%; top:50%; width:48px; height:48px; border-radius:50%;
-    transform:translate(-50%,-50%);
-    background:radial-gradient(circle at 38% 32%, rgba(201,185,138,.5), rgba(110,103,89,.35));
-    border:1px solid rgba(201,185,138,.35);
+  .dbtn{
+    border:1px solid rgba(167,159,146,.3); border-radius:8px;
+    background:rgba(167,159,146,.07); color:var(--lamp);
+    font-size:18px; line-height:1; padding:0; cursor:pointer;
+    -webkit-tap-highlight-color:transparent; user-select:none; -webkit-user-select:none;
   }
-  #stickRays{position:absolute; inset:0; pointer-events:none;}
-  #stickRays line{stroke:var(--lamp); stroke-width:2; stroke-linecap:round; transition:opacity .1s;}
+  .dbtn.on{background:rgba(201,185,138,.3); border-color:var(--lamp);}
+  #dpad .dc{pointer-events:none;}
 
   /* ---------- Screens ---------- */
   .screen{
@@ -221,18 +219,16 @@
     <span id="fireRing"></span><span id="fireDot"></span>
   </button>
 
-  <div id="stick" class="hidden" aria-label="Joystick de visée (8 directions)">
-    <svg id="stickRays" viewBox="0 0 112 112" aria-hidden="true">
-      <line x1="80" y1="56" x2="104" y2="56" stroke-opacity=".45"/>
-      <line x1="73" y1="73" x2="90" y2="90" stroke-opacity=".25"/>
-      <line x1="56" y1="80" x2="56" y2="104" stroke-opacity=".45"/>
-      <line x1="39" y1="73" x2="22" y2="90" stroke-opacity=".25"/>
-      <line x1="32" y1="56" x2="8"  y2="56" stroke-opacity=".45"/>
-      <line x1="39" y1="39" x2="22" y2="22" stroke-opacity=".25"/>
-      <line x1="56" y1="32" x2="56" y2="8"  stroke-opacity=".45"/>
-      <line x1="73" y1="39" x2="90" y2="22" stroke-opacity=".25"/>
-    </svg>
-    <div id="stickKnob"></div>
+  <div id="dpad" class="hidden" aria-label="Flèches de visée (8 directions)">
+    <button class="dbtn" data-dx="-1" data-dy="-1" aria-label="Haut gauche">&#8598;</button>
+    <button class="dbtn" data-dx="0"  data-dy="-1" aria-label="Haut">&#8593;</button>
+    <button class="dbtn" data-dx="1"  data-dy="-1" aria-label="Haut droite">&#8599;</button>
+    <button class="dbtn" data-dx="-1" data-dy="0"  aria-label="Gauche">&#8592;</button>
+    <div class="dc"></div>
+    <button class="dbtn" data-dx="1"  data-dy="0"  aria-label="Droite">&#8594;</button>
+    <button class="dbtn" data-dx="-1" data-dy="1"  aria-label="Bas gauche">&#8601;</button>
+    <button class="dbtn" data-dx="0"  data-dy="1"  aria-label="Bas">&#8595;</button>
+    <button class="dbtn" data-dx="1"  data-dy="1"  aria-label="Bas droite">&#8600;</button>
   </div>
 
   <div id="menu" class="screen">
@@ -247,7 +243,7 @@
     <div id="mBest" class="best"></div>
     <div id="mCtl"></div>
     <div class="foot">
-      BLINDFIRE v0.9 · prototype solo «&nbsp;Survie&nbsp;»<br>
+      BLINDFIRE v0.10 · prototype solo «&nbsp;Survie&nbsp;»<br>
       Astuce iPhone&nbsp;: Partager&nbsp;→ «&nbsp;Sur l’écran d’accueil&nbsp;» pour jouer en plein écran.
     </div>
   </div>
@@ -423,42 +419,20 @@ window.addEventListener('keydown', e => {
   if(e.key==='ArrowUp')    Input.pitch = clamp(Input.pitch+2.5,-75,55);
   if(e.key==='ArrowDown')  Input.pitch = clamp(Input.pitch-2.5,-75,55);
 });
-// joystick virtuel (mode tactile) : rotation continue + inclinaison
-const elStick = $('stick'), elKnob = $('stickKnob');
-const stick = {id:null, x:0, y:0};
-const STICK_R = 40;
-const stickRays = elStick.querySelectorAll('#stickRays line');
-function stickReset(){
-  stick.id = null; stick.x = 0; stick.y = 0;
-  elKnob.style.transform = 'translate(-50%,-50%)';
-  stickRays.forEach(l => { l.style.opacity = ''; });
-}
-function stickMove(e){
-  const r = elStick.getBoundingClientRect();
-  let dx = e.clientX - (r.left + r.width/2);
-  let dy = e.clientY - (r.top + r.height/2);
-  let len = Math.hypot(dx,dy);
-  let idx = -1;
-  if(len > 8){
-    // accroche sur 8 branches : G, D, haut, bas et diagonales
-    const snap = Math.round(Math.atan2(dy,dx)/(Math.PI/4))*(Math.PI/4);
-    const mag = Math.min(len, STICK_R);
-    dx = Math.cos(snap)*mag; dy = Math.sin(snap)*mag;
-    idx = ((Math.round(snap/(Math.PI/4))%8)+8)%8;
-  }else{ dx = 0; dy = 0; }
-  stick.x = dx/STICK_R; stick.y = dy/STICK_R;
-  elKnob.style.transform = 'translate(calc(-50% + '+dx.toFixed(1)+'px), calc(-50% + '+dy.toFixed(1)+'px))';
-  stickRays.forEach((l,i) => { l.style.opacity = i===idx ? '1' : ''; });
-}
-elStick.addEventListener('pointerdown', e => {
-  e.preventDefault(); e.stopPropagation();
-  stick.id = e.pointerId;
-  try{ elStick.setPointerCapture(e.pointerId); }catch(err){}
-  stickMove(e);
+// pavé directionnel (mode tactile) : maintenir une flèche pour pivoter
+const elDpad = $('dpad');
+const dpad = {dx:0, dy:0, holdT:0};
+elDpad.querySelectorAll('.dbtn').forEach(b => {
+  const release = () => { dpad.dx = 0; dpad.dy = 0; b.classList.remove('on'); };
+  b.addEventListener('pointerdown', e => {
+    e.preventDefault(); e.stopPropagation();
+    dpad.dx = +b.dataset.dx; dpad.dy = +b.dataset.dy; dpad.holdT = 0;
+    b.classList.add('on');
+    try{ b.setPointerCapture(e.pointerId); }catch(err){}
+  });
+  b.addEventListener('pointerup', release);
+  b.addEventListener('pointercancel', release);
 });
-elStick.addEventListener('pointermove', e => { if(e.pointerId===stick.id) stickMove(e); });
-elStick.addEventListener('pointerup', e => { if(e.pointerId===stick.id) stickReset(); });
-elStick.addEventListener('pointercancel', e => { if(e.pointerId===stick.id) stickReset(); });
 
 document.addEventListener('touchmove', e => e.preventDefault(), {passive:false});
 document.addEventListener('gesturestart', e => e.preventDefault());
@@ -514,6 +488,7 @@ const AU = {
       o.connect(og); og.connect(this.tensionG); o.start();
     });
     this.startAmbience();
+    this.loadFiles();
     // silence de déverrouillage iOS
     const s = c.createBufferSource(); s.buffer = c.createBuffer(1,1,22050);
     s.connect(c.destination); s.start(0);
@@ -570,17 +545,56 @@ const AU = {
   },
   startAmbience(){
     const c = this.ctx;
-    // souffle sourd (discret : il ne doit jamais masquer les pas)
+    // lit synthétique (remplacé en douceur si le fichier d'ambiance se charge)
+    this.synthAmb = c.createGain(); this.synthAmb.gain.value = 1;
+    this.synthAmb.connect(this.master);
     const n = this.noiseSrc(); n.loop = true;
     const lp = c.createBiquadFilter(); lp.type='lowpass'; lp.frequency.value = 95;
     const ng = c.createGain(); ng.gain.value = 0.03;
-    n.connect(lp); lp.connect(ng); ng.connect(this.master); n.start();
-    // bourdon battant
+    n.connect(lp); lp.connect(ng); ng.connect(this.synthAmb); n.start();
     [[46,0.017],[46.7,0.012]].forEach(([f,v]) => {
       const o = c.createOscillator(); o.type='sine'; o.frequency.value = f;
       const og = c.createGain(); og.gain.value = v;
-      o.connect(og); og.connect(this.master); o.start();
+      o.connect(og); og.connect(this.synthAmb); o.start();
     });
+  },
+  // fichiers audio du dossier sons/ (version GitHub Pages ; repli synthétique sinon)
+  files:{}, ambSrc:null,
+  loadFiles(){
+    if(this._filesTried || !this.ctx) return;
+    this._filesTried = true;
+    const grab = (name, url, cb) => {
+      try{
+        fetch(url).then(r => { if(!r.ok) throw new Error('http'); return r.arrayBuffer(); })
+          .then(ab => new Promise((res, rej) => this.ctx.decodeAudioData(ab, res, rej)))
+          .then(buf => { this.files[name] = buf; if(cb) cb(); })
+          .catch(()=>{});
+      }catch(e){}
+    };
+    grab('amb', 'sons/ambiance.m4a', () => this.startFileAmbience());
+    grab('start', 'sons/game-start.m4a');
+  },
+  startFileAmbience(){
+    if(this.ambSrc || !this.files.amb || !this.ctx) return;
+    const c = this.ctx, t = c.currentTime;
+    const s = c.createBufferSource(); s.buffer = this.files.amb; s.loop = true;
+    const gn = c.createGain();
+    gn.gain.setValueAtTime(0.0001, t);
+    gn.gain.exponentialRampToValueAtTime(0.35, t+4);
+    s.connect(gn); gn.connect(this.master); s.start(t);
+    this.ambSrc = s;
+    if(this.synthAmb) this.synthAmb.gain.setTargetAtTime(0.15, t, 2);
+  },
+  playStart(){
+    const b = this.files.start;
+    if(!b || !this.ctx) return;
+    const c = this.ctx, t = c.currentTime;
+    const s = c.createBufferSource(); s.buffer = b;
+    const gn = c.createGain(); gn.gain.value = 0.65;
+    s.connect(gn); gn.connect(this.master);
+    const hg = c.createGain(); hg.gain.value = 0.35;
+    s.connect(hg); hg.connect(this.hallIn);
+    s.start(t);
   },
   drip(azDeg, dist){
     if(!this.ctx) return;
@@ -1187,6 +1201,7 @@ function startSurvival(){
   resetRun();
   game.state = 'playing';
   game.homeYaw = wrapDeg(Input.yaw + Input.touchYaw);
+  AU.playStart();
   beginWave(1);
 }
 function beginWave(n){
@@ -1776,7 +1791,7 @@ function drawCross(light){
 // ---------------- HUD ----------------
 function hud(light){
   const inGame = game.state==='playing' || game.state==='tuto' || game.state==='dying';
-  elStick.classList.toggle('hidden', !inGame || Input.gyroActive);
+  elDpad.classList.toggle('hidden', !inGame || Input.gyroActive);
   if(game.state==='playing' || game.state==='dying'){
     elWave.textContent = game.wave>0 ? 'Vague '+game.wave : '';
     elScore.textContent = game.score;
@@ -1806,12 +1821,13 @@ function frame(ts){
   timeScale += (1-timeScale)*Math.min(1, rdt*5);
   const dt = rdt*timeScale;
 
-  // joystick : réponse quadratique pour la précision près du centre
-  if(!Input.gyroActive && stick.id!==null){
-    const sx = Math.abs(stick.x)>0.12 ? stick.x : 0;
-    const sy = Math.abs(stick.y)>0.12 ? stick.y : 0;
-    Input.yaw = wrapDeg(Input.yaw + sx*Math.abs(sx)*150*rdt);
-    Input.pitch = clamp(Input.pitch - sy*Math.abs(sy)*95*rdt, -75, 55);
+  // pavé fléché : rotation continue avec accélération progressive
+  if(!Input.gyroActive && (dpad.dx || dpad.dy)){
+    dpad.holdT += rdt;
+    const ramp = 0.45 + 0.55*Math.min(1, dpad.holdT/0.6);
+    const diag = (dpad.dx && dpad.dy) ? 0.72 : 1;
+    Input.yaw = wrapDeg(Input.yaw + dpad.dx*120*ramp*diag*rdt);
+    Input.pitch = clamp(Input.pitch - dpad.dy*85*ramp*diag*rdt, -75, 55);
   }
 
   // visée = capteur + tremblement + recul
@@ -1874,7 +1890,7 @@ function launch(mode){
   elFire.classList.remove('hidden');
   elCtl.textContent = Input.gyroActive
     ? 'Contrôles : gyroscope ✓ — tourne-toi physiquement pour viser'
-    : 'Contrôles : tactile — joystick à gauche ou glisser pour viser';
+    : 'Contrôles : tactile — flèches en bas à gauche ou glisser pour viser';
   if(mode==='tuto') startTuto(); else startSurvival();
 }
 function waitForGyro(){
@@ -1928,7 +1944,7 @@ $('bGyro').addEventListener('click', () => {
 $('bTouch').addEventListener('click', () => {
   Input.mode = 'touch';
   launch(pendingMode);
-  showSub('Mode tactile : joystick en bas à gauche (ou glisse sur l’écran) pour viser.', 3200);
+  showSub('Mode tactile : flèches en bas à gauche (ou glisse sur l’écran) pour viser.', 3200);
 });
 
 // ---------------- test auditif gauche / droite ----------------
