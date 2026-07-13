@@ -1,0 +1,1452 @@
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>BLINDFIRE</title>
+<style>
+  :root{
+    --void:#030306; --ink:#0b0b10; --bone:#a79f92; --dim:#6e6759;
+    --lamp:#c9b98a; --blood:#e0362c; --blood-d:#7e1712; --eye:#ffe9b8;
+  }
+  html,body{background:var(--void);margin:0;padding:0;overscroll-behavior:none;}
+  #game{
+    position:fixed; inset:0; overflow:hidden; background:var(--void);
+    font-family:"Avenir Next",system-ui,-apple-system,"Segoe UI",sans-serif;
+    color:var(--bone);
+    touch-action:none; user-select:none; -webkit-user-select:none; -webkit-touch-callout:none;
+  }
+  #cv{position:absolute; inset:0; width:100%; height:100%; display:block;}
+  .display{font-family:Futura,"Avenir Next Condensed","Arial Narrow",system-ui,sans-serif;}
+  .hidden{opacity:0 !important; pointer-events:none !important;}
+
+  /* ---------- HUD ---------- */
+  #hud{position:absolute; inset:0; pointer-events:none; transition:opacity .4s;}
+  #hudTop{
+    position:absolute; top:calc(10px + env(safe-area-inset-top)); left:16px; right:16px;
+    display:flex; justify-content:space-between; align-items:baseline;
+  }
+  .hudlab{
+    font-family:Futura,"Avenir Next Condensed",system-ui,sans-serif;
+    font-size:13px; letter-spacing:.32em; text-transform:uppercase; color:var(--dim);
+  }
+  #hScore{font-variant-numeric:tabular-nums; color:var(--bone);}
+  #meter{
+    position:absolute; right:12px; top:50%; transform:translateY(-50%);
+    width:4px; height:30vh; background:rgba(167,159,146,.12); border-radius:2px;
+  }
+  #meterFill{
+    position:absolute; bottom:0; left:0; width:100%; height:0%;
+    background:linear-gradient(to top,#5c5340,var(--lamp) 55%,var(--blood));
+    border-radius:2px;
+  }
+  #meterLab{
+    position:absolute; right:10px; top:50%; transform:translateY(-50%);
+    writing-mode:vertical-rl; font-size:9px; letter-spacing:.4em; color:var(--dim);
+    text-transform:uppercase;
+  }
+  #seen{
+    position:absolute; right:24px; top:calc(50% + 17vh);
+    writing-mode:vertical-rl; font-size:10px; letter-spacing:.3em; color:var(--blood);
+    text-transform:uppercase; opacity:0; transition:opacity .3s;
+    animation:seenPulse 1s infinite;
+  }
+  @keyframes seenPulse{50%{filter:brightness(1.8);}}
+  #msg{
+    position:absolute; top:26%; left:0; right:0; text-align:center;
+    font-family:Futura,"Avenir Next Condensed",system-ui,sans-serif;
+    font-size:clamp(26px,8vw,44px); letter-spacing:.38em; text-indent:.38em;
+    color:var(--bone); text-shadow:0 0 24px rgba(201,185,138,.25);
+    opacity:0; transition:opacity .5s; text-transform:uppercase; text-wrap:balance;
+  }
+  #msg.show{opacity:1;}
+  #msg.blood{color:var(--blood); text-shadow:0 0 24px rgba(224,54,44,.4);}
+  #sub{
+    position:absolute; bottom:150px; left:10%; right:10%; text-align:center;
+    font-size:14px; line-height:1.5; color:var(--bone);
+    text-shadow:0 1px 8px #000; opacity:0; transition:opacity .5s;
+  }
+  #sub.show{opacity:.92;}
+  #prog{
+    position:absolute; bottom:132px; left:35%; right:35%; height:2px;
+    background:rgba(167,159,146,.15); transition:opacity .3s;
+  }
+  #progFill{height:100%; width:0%; background:var(--lamp);}
+
+  /* ---------- Fire button ---------- */
+  #fire{
+    position:absolute; bottom:calc(26px + env(safe-area-inset-bottom)); left:50%;
+    transform:translateX(-50%);
+    width:92px; height:92px; border-radius:50%;
+    background:rgba(224,54,44,.06);
+    border:none; padding:0; cursor:pointer;
+    transition:opacity .4s; -webkit-tap-highlight-color:transparent;
+  }
+  #fireRing{
+    position:absolute; inset:0; border-radius:50%;
+    background:conic-gradient(var(--blood) 360deg, transparent 0);
+    -webkit-mask:radial-gradient(circle, transparent 62%, #000 64%);
+    mask:radial-gradient(circle, transparent 62%, #000 64%);
+  }
+  #fireDot{
+    position:absolute; inset:30px; border-radius:50%;
+    background:radial-gradient(circle at 40% 35%, #ff5d4d, var(--blood-d));
+    box-shadow:0 0 18px rgba(224,54,44,.35);
+    transition:transform .08s;
+  }
+  #fire:active #fireDot{transform:scale(.82);}
+
+  /* ---------- Screens ---------- */
+  .screen{
+    position:absolute; inset:0; z-index:10;
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    gap:14px; padding:24px; text-align:center;
+    background:radial-gradient(120% 90% at 50% 30%, #08080d 0%, #020204 70%);
+    transition:opacity .45s;
+  }
+  .eclipse{
+    width:84px; height:84px; border-radius:50%; margin-bottom:4px;
+    background:radial-gradient(circle at 32% 28%, #15151c 0%, #060609 55%, #030306 100%);
+    box-shadow:0 0 0 1px rgba(201,185,138,.18), 0 0 34px 2px rgba(201,185,138,.10),
+               inset -6px -10px 24px rgba(0,0,0,.9);
+  }
+  h1{
+    font-family:Futura,"Avenir Next Condensed","Arial Narrow",sans-serif;
+    font-weight:500; font-size:clamp(34px,11vw,54px);
+    letter-spacing:.34em; text-indent:.34em; margin:0; color:var(--bone);
+  }
+  h1 b{font-weight:500; color:var(--blood);}
+  h2{
+    font-family:Futura,"Avenir Next Condensed",sans-serif; font-weight:500;
+    font-size:clamp(30px,10vw,46px); letter-spacing:.4em; text-indent:.4em;
+    color:var(--blood); margin:0 0 6px;
+  }
+  .tag{margin:0 0 6px; font-size:14px; color:var(--dim); font-style:italic;}
+  .ear{
+    font-size:13px; color:var(--lamp); border:1px solid rgba(201,185,138,.25);
+    padding:9px 16px; border-radius:3px; margin-bottom:10px; max-width:300px; line-height:1.45;
+  }
+  .btn{
+    font-family:Futura,"Avenir Next Condensed",sans-serif;
+    font-size:15px; letter-spacing:.28em; text-indent:.28em; text-transform:uppercase;
+    color:var(--bone); background:none; border:1px solid rgba(167,159,146,.4);
+    padding:14px 0; width:min(260px,80vw); border-radius:3px; cursor:pointer;
+    -webkit-tap-highlight-color:transparent;
+  }
+  .btn:active{background:rgba(167,159,146,.12);}
+  .btn:focus-visible{outline:2px solid var(--lamp); outline-offset:2px;}
+  .btn.primary{
+    color:#fff; border-color:var(--blood);
+    background:linear-gradient(180deg, rgba(224,54,44,.22), rgba(126,23,18,.30));
+    box-shadow:0 0 22px rgba(224,54,44,.18);
+  }
+  .btn.primary:active{background:rgba(224,54,44,.4);}
+  .btn.ghost{border-color:rgba(167,159,146,.18); color:var(--dim); font-size:12px; padding:10px 0;}
+  .best{font-size:12px; letter-spacing:.2em; color:var(--dim); text-transform:uppercase; font-variant-numeric:tabular-nums;}
+  .foot{
+    position:absolute; bottom:calc(14px + env(safe-area-inset-bottom)); left:20px; right:20px;
+    font-size:10.5px; color:#454038; line-height:1.6;
+  }
+  #mCtl{font-size:11px; color:var(--dim); letter-spacing:.1em;}
+  .gateTxt{font-size:14px; color:var(--bone); max-width:320px; line-height:1.55; margin:0 0 6px;}
+  #gStat{font-size:13px; color:var(--lamp); max-width:300px; line-height:1.5; min-height:44px;}
+  #gStat a{color:var(--lamp); text-decoration:underline;}
+  #oStats{font-size:14px; line-height:2; color:var(--bone); font-variant-numeric:tabular-nums; margin-bottom:8px;}
+  #oStats em{color:var(--lamp); font-style:normal;}
+  #oStats .rec{color:var(--blood); letter-spacing:.2em; text-transform:uppercase; font-size:12px;}
+  label.opt{display:flex; align-items:center; gap:8px; font-size:12px; color:var(--dim); cursor:pointer;}
+
+  /* ---------- Floaters ---------- */
+  .float{
+    position:absolute; z-index:5; pointer-events:none;
+    font-family:Futura,"Avenir Next Condensed",sans-serif;
+    font-size:16px; letter-spacing:.15em; color:var(--lamp);
+    text-shadow:0 0 12px rgba(201,185,138,.5);
+    animation:rise .95s ease-out forwards;
+  }
+  .float.grey{color:var(--dim); font-size:12px;}
+  @keyframes rise{
+    0%{opacity:0; transform:translate(-50%,6px);}
+    15%{opacity:1;}
+    100%{opacity:0; transform:translate(-50%,-44px);}
+  }
+  @media (prefers-reduced-motion: reduce){
+    .float{animation-duration:.5s;}
+    #seen{animation:none;}
+  }
+</style>
+
+<div id="game">
+  <canvas id="cv"></canvas>
+
+  <div id="hud" class="hidden">
+    <div id="hudTop">
+      <div id="hWave" class="hudlab"></div>
+      <div id="hScore" class="hudlab">0</div>
+    </div>
+    <div id="meter"><div id="meterFill"></div></div>
+    <div id="meterLab">Exposition</div>
+    <div id="seen">ils te voient</div>
+    <div id="msg"></div>
+    <div id="sub"></div>
+    <div id="prog" class="hidden"><div id="progFill"></div></div>
+  </div>
+
+  <button id="fire" class="hidden" aria-label="Tirer">
+    <span id="fireRing"></span><span id="fireDot"></span>
+  </button>
+
+  <div id="menu" class="screen">
+    <div class="eclipse" aria-hidden="true"></div>
+    <h1>BLIND<b>FIRE</b></h1>
+    <p class="tag">Tes yeux mentent. Tes oreilles, jamais.</p>
+    <div class="ear">&#127911; Écouteurs indispensables&nbsp;— ici, le son est ta vision.</div>
+    <button id="bPlay" class="btn primary">Jouer</button>
+    <button id="bTuto" class="btn">Tutoriel</button>
+    <button id="bTest" class="btn ghost">Tester le son 3D</button>
+    <label class="opt"><input type="checkbox" id="optFlash"> Flashs réduits (photosensibilité)</label>
+    <div id="mBest" class="best"></div>
+    <div id="mCtl"></div>
+    <div class="foot">
+      BLINDFIRE v0.1 · prototype solo «&nbsp;Survie&nbsp;»<br>
+      Astuce iPhone&nbsp;: Partager&nbsp;→ «&nbsp;Sur l’écran d’accueil&nbsp;» pour jouer en plein écran.
+    </div>
+  </div>
+
+  <div id="over" class="screen hidden">
+    <h2>DÉVORÉ</h2>
+    <div id="oStats"></div>
+    <button id="bAgain" class="btn primary">Rejouer</button>
+    <button id="bMenu" class="btn">Menu</button>
+  </div>
+
+  <div id="gate" class="screen hidden">
+    <div class="eclipse" aria-hidden="true"></div>
+    <h2>CAPTEURS</h2>
+    <p class="gateTxt">
+      BLINDFIRE se joue avec le corps&nbsp;: <b>tourne-toi</b> physiquement pour balayer la
+      pièce, <b>lève le téléphone à la verticale</b> (comme pour prendre une photo)
+      pour éclairer à pleine puissance.
+    </p>
+    <button id="bGyro" class="btn primary">Activer le gyroscope</button>
+    <div id="gStat"></div>
+    <button id="bTouch" class="btn ghost">Jouer en mode tactile (au doigt)</button>
+  </div>
+</div>
+
+<script>
+'use strict';
+/* ================================================================
+   BLINDFIRE v0.1 — prototype solo (PRD MVP option A)
+   Un fichier autonome : audio binaural synthétisé, gyroscope,
+   lumière = visée = exposition. Aucune ressource externe.
+   ================================================================ */
+
+// Le viewport doit vivre dans <head> (l'hébergeur artifact enveloppe ce fichier).
+(function(){
+  let m = document.querySelector('meta[name=viewport]');
+  if(!m){ m = document.createElement('meta'); m.name = 'viewport';
+    m.content = 'width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover'; }
+  document.head.appendChild(m);
+  document.title = 'BLINDFIRE';
+})();
+
+// ---------------- utilitaires ----------------
+const TAU = Math.PI*2, D2R = Math.PI/180;
+const clamp = (v,a,b)=> v<a?a : v>b?b : v;
+const lerp  = (a,b,t)=> a+(b-a)*t;
+const rand  = (a,b)=> a + Math.random()*(b-a);
+const wrapDeg = a => ((a%360)+360)%360;
+function angDiff(a,b){ let d = wrapDeg(a-b); return d>180 ? d-360 : d; }
+
+const store = {
+  get(k){ try{ return localStorage.getItem(k); }catch(e){ return null; } },
+  set(k,v){ try{ localStorage.setItem(k,v); }catch(e){} }
+};
+
+const EYE = 1.5;            // hauteur des yeux du joueur (m)
+const LIGHT_RANGE = 16;     // portée de ta lumière (m)
+const RELOAD = 1.4;         // secondes
+
+// ---------------- DOM ----------------
+const $ = id => document.getElementById(id);
+const cv = $('cv'), g = cv.getContext('2d');
+const elHud=$('hud'), elWave=$('hWave'), elScore=$('hScore'),
+      elMeter=$('meterFill'), elSeen=$('seen'), elMsg=$('msg'), elSub=$('sub'),
+      elProg=$('prog'), elProgF=$('progFill'),
+      elFire=$('fire'), elRing=$('fireRing'),
+      elMenu=$('menu'), elOver=$('over'), elStats=$('oStats'),
+      elBest=$('mBest'), elCtl=$('mCtl');
+
+let W=0, H=0, dpr=1;
+function fit(){
+  const w = window.innerWidth, h = window.innerHeight;
+  if(w===W && h===H && cv.width) return;
+  W=w; H=h; dpr = Math.min(2, window.devicePixelRatio||1);
+  cv.width = W*dpr; cv.height = H*dpr;
+}
+fit();
+
+// ---------------- capteurs / visée ----------------
+const Input = {
+  mode:'touch', gyroActive:false, yaw:0, pitch:-34,
+  _drag:null,
+  drag(dx,dy){
+    if(this.gyroActive) return;
+    this.yaw = wrapDeg(this.yaw + dx*0.26);
+    this.pitch = clamp(this.pitch - dy*0.26, -75, 55);
+  }
+};
+
+// quaternion façon three.js DeviceOrientationControls (évite le gimbal lock à la verticale)
+function qmul(a,b){
+  return {
+    x: a.x*b.w + a.w*b.x + a.y*b.z - a.z*b.y,
+    y: a.y*b.w + a.w*b.y + a.z*b.x - a.x*b.z,
+    z: a.z*b.w + a.w*b.z + a.x*b.y - a.y*b.x,
+    w: a.w*b.w - a.x*b.x - a.y*b.y - a.z*b.z
+  };
+}
+function qrot(q,v){
+  const qx=q.x, qy=q.y, qz=q.z, qw=q.w;
+  const tx = 2*(qy*v.z - qz*v.y), ty = 2*(qz*v.x - qx*v.z), tz = 2*(qx*v.y - qy*v.x);
+  return {
+    x: v.x + qw*tx + (qy*tz - qz*ty),
+    y: v.y + qw*ty + (qz*tx - qx*tz),
+    z: v.z + qw*tz + (qx*ty - qy*tx)
+  };
+}
+const Q1 = {x:-Math.sqrt(0.5), y:0, z:0, w:Math.sqrt(0.5)};
+function screenAngle(){
+  if(screen.orientation && typeof screen.orientation.angle === 'number') return screen.orientation.angle;
+  return (typeof window.orientation === 'number') ? window.orientation : 0;
+}
+function onOrient(e){
+  if(e.alpha==null && e.beta==null && e.gamma==null) return;
+  // euler YXZ : x=beta, y=alpha, z=-gamma
+  const ex=(e.beta||0)*D2R/2, ey=(e.alpha||0)*D2R/2, ez=(-(e.gamma||0))*D2R/2;
+  const c1=Math.cos(ex), s1=Math.sin(ex), c2=Math.cos(ey), s2=Math.sin(ey), c3=Math.cos(ez), s3=Math.sin(ez);
+  let q = {
+    x: s1*c2*c3 + c1*s2*s3,
+    y: c1*s2*c3 - s1*c2*s3,
+    z: c1*c2*s3 - s1*s2*c3,
+    w: c1*c2*c3 + s1*s2*s3
+  };
+  q = qmul(q, Q1);
+  const o = -screenAngle()*D2R/2;
+  q = qmul(q, {x:0, y:0, z:Math.sin(o), w:Math.cos(o)});
+  const v = qrot(q, {x:0, y:0, z:-1});
+  const az = Math.atan2(v.x, -v.z)/D2R;
+  const pit = Math.asin(clamp(v.y,-1,1))/D2R;
+  if(!Input.gyroActive){
+    Input.gyroActive = true; Input.mode = 'gyro';
+    Input.yaw = az; Input.pitch = pit;
+    elCtl.textContent = 'Contrôles : gyroscope ✓ — tourne-toi physiquement pour viser';
+  }
+  Input.yaw = wrapDeg(Input.yaw + angDiff(az, Input.yaw)*0.4);
+  Input.pitch += (pit - Input.pitch)*0.4;
+}
+
+// glisser = viser (repli sans gyroscope / bureau)
+cv.addEventListener('pointerdown', e => { Input._drag = {id:e.pointerId, x:e.clientX, y:e.clientY}; });
+window.addEventListener('pointermove', e => {
+  const d = Input._drag;
+  if(!d || e.pointerId!==d.id) return;
+  Input.drag(e.clientX-d.x, e.clientY-d.y);
+  d.x = e.clientX; d.y = e.clientY;
+});
+window.addEventListener('pointerup', e => { if(Input._drag && e.pointerId===Input._drag.id) Input._drag=null; });
+window.addEventListener('keydown', e => {
+  if(e.code==='Space'){ e.preventDefault(); fireGun(); }
+  if(e.key==='ArrowLeft')  Input.yaw = wrapDeg(Input.yaw-4);
+  if(e.key==='ArrowRight') Input.yaw = wrapDeg(Input.yaw+4);
+  if(e.key==='ArrowUp')    Input.pitch = clamp(Input.pitch+2.5,-75,55);
+  if(e.key==='ArrowDown')  Input.pitch = clamp(Input.pitch-2.5,-75,55);
+});
+document.addEventListener('touchmove', e => e.preventDefault(), {passive:false});
+document.addEventListener('gesturestart', e => e.preventDefault());
+document.addEventListener('contextmenu', e => e.preventDefault());
+
+// ---------------- moteur audio (tout est synthétisé) ----------------
+const AU = {
+  ctx:null, master:null, echoIn:null, noiseBuf:null, tensionG:null,
+  init(){
+    if(this.ctx) return;
+    const C = window.AudioContext || window.webkitAudioContext;
+    if(!C) return;
+    const c = this.ctx = new C();
+    const comp = c.createDynamicsCompressor();
+    comp.threshold.value = -16; comp.knee.value = 18; comp.ratio.value = 8;
+    comp.connect(c.destination);
+    this.master = c.createGain(); this.master.gain.value = 0.9;
+    this.master.connect(comp);
+    // écho de caverne
+    const dly = c.createDelay(1); dly.delayTime.value = 0.24;
+    const fb = c.createGain(); fb.gain.value = 0.34;
+    const lp = c.createBiquadFilter(); lp.type='lowpass'; lp.frequency.value = 1300;
+    const wet = c.createGain(); wet.gain.value = 0.32;
+    dly.connect(fb); fb.connect(lp); lp.connect(dly);
+    dly.connect(wet); wet.connect(this.master);
+    this.echoIn = dly;
+    // bruit blanc partagé (2 s)
+    const len = 2*c.sampleRate;
+    this.noiseBuf = c.createBuffer(1, len, c.sampleRate);
+    const d = this.noiseBuf.getChannelData(0);
+    for(let i=0;i<len;i++) d[i] = Math.random()*2-1;
+    // nappe de tension (battement dissonant)
+    this.tensionG = c.createGain(); this.tensionG.gain.value = 0;
+    this.tensionG.connect(this.master);
+    [392, 394.6].forEach(f => {
+      const o = c.createOscillator(); o.type='sine'; o.frequency.value = f;
+      const og = c.createGain(); og.gain.value = 0.5;
+      o.connect(og); og.connect(this.tensionG); o.start();
+    });
+    this.startAmbience();
+    // silence de déverrouillage iOS
+    const s = c.createBufferSource(); s.buffer = c.createBuffer(1,1,22050);
+    s.connect(c.destination); s.start(0);
+  },
+  resume(){ if(this.ctx && this.ctx.state!=='running') this.ctx.resume(); },
+  suspend(){ if(this.ctx && this.ctx.state==='running') this.ctx.suspend(); },
+  now(){ return this.ctx ? this.ctx.currentTime : 0; },
+  noiseSrc(dur){
+    const s = this.ctx.createBufferSource(); s.buffer = this.noiseBuf;
+    s._dur = dur; return s;
+  },
+  playNoise(t, dur, filterType, f0, f1, vol, dest, Q){
+    const c = this.ctx;
+    const s = this.noiseSrc(dur);
+    const fl = c.createBiquadFilter(); fl.type = filterType; fl.Q.value = Q||0.8;
+    fl.frequency.setValueAtTime(f0, t);
+    if(f1 && f1!==f0) fl.frequency.exponentialRampToValueAtTime(f1, t+dur);
+    const gn = c.createGain();
+    gn.gain.setValueAtTime(vol, t);
+    gn.gain.exponentialRampToValueAtTime(0.001, t+dur);
+    s.connect(fl); fl.connect(gn); gn.connect(dest||this.master);
+    s.start(t, Math.random()*Math.max(0.1, 1.9-dur), dur+0.05);
+  },
+  playTone(t, dur, type, f0, f1, vol, dest){
+    const c = this.ctx;
+    const o = c.createOscillator(); o.type = type;
+    o.frequency.setValueAtTime(f0, t);
+    if(f1 && f1!==f0) o.frequency.exponentialRampToValueAtTime(Math.max(1,f1), t+dur);
+    const gn = c.createGain();
+    gn.gain.setValueAtTime(vol, t);
+    gn.gain.exponentialRampToValueAtTime(0.001, t+dur);
+    o.connect(gn); gn.connect(dest||this.master);
+    o.start(t); o.stop(t+dur+0.05);
+    return o;
+  },
+  panner(){
+    const p = this.ctx.createPanner();
+    p.panningModel='HRTF'; p.distanceModel='inverse';
+    p.refDistance=1.6; p.rolloffFactor=1.15; p.maxDistance=60;
+    return p;
+  },
+  setPos(node,x,y,z){
+    if(node.positionX){ node.positionX.value=x; node.positionY.value=y; node.positionZ.value=z; }
+    else node.setPosition(x,y,z);
+  },
+  listen(yawDeg){
+    if(!this.ctx) return;
+    const L = this.ctx.listener, r = yawDeg*D2R;
+    const fx = Math.sin(r), fz = -Math.cos(r);
+    if(L.forwardX){
+      L.forwardX.value=fx; L.forwardY.value=0; L.forwardZ.value=fz;
+      L.upX.value=0; L.upY.value=1; L.upZ.value=0;
+    }else if(L.setOrientation) L.setOrientation(fx,0,fz,0,1,0);
+  },
+  startAmbience(){
+    const c = this.ctx;
+    // souffle sourd
+    const n = this.noiseSrc(); n.loop = true;
+    const lp = c.createBiquadFilter(); lp.type='lowpass'; lp.frequency.value = 95;
+    const ng = c.createGain(); ng.gain.value = 0.06;
+    n.connect(lp); lp.connect(ng); ng.connect(this.master); n.start();
+    // bourdon battant
+    [[46,0.03],[46.7,0.022]].forEach(([f,v]) => {
+      const o = c.createOscillator(); o.type='sine'; o.frequency.value = f;
+      const og = c.createGain(); og.gain.value = v;
+      o.connect(og); og.connect(this.master); o.start();
+    });
+  },
+  drip(azDeg, dist){
+    if(!this.ctx) return;
+    const c=this.ctx, t=c.currentTime;
+    const p = this.panner();
+    this.setPos(p, Math.sin(azDeg*D2R)*dist, 1.8, -Math.cos(azDeg*D2R)*dist);
+    p.connect(this.master);
+    const eg = c.createGain(); eg.gain.value = 0.8;
+    p.connect(eg); eg.connect(this.echoIn);
+    this.playTone(t, 0.06, 'sine', rand(1500,2300), 480, 0.35, p);
+  },
+  thump(vol){
+    if(!this.ctx) return;
+    const t = this.ctx.currentTime;
+    this.playTone(t, 0.14, 'sine', 64, 40, vol, this.master);
+    this.playTone(t+0.16, 0.12, 'sine', 52, 36, vol*0.55, this.master);
+  },
+  shot(){
+    const c=this.ctx; if(!c) return;
+    const t = c.currentTime;
+    this.playNoise(t, 0.30, 'lowpass', 7500, 320, 1.05, this.master);
+    this.playTone(t, 0.24, 'sine', 155, 42, 0.9, this.master);
+    this.playNoise(t, 0.02, 'highpass', 3500, 3500, 0.5, this.master);
+    const eg = c.createGain(); eg.gain.value = 0.9; eg.connect(this.echoIn);
+    this.playNoise(t, 0.2, 'lowpass', 3000, 500, 0.7, eg);
+  },
+  dry(){
+    if(!this.ctx) return;
+    const t = this.ctx.currentTime;
+    this.playTone(t, 0.02, 'square', 1500, 1100, 0.12, this.master);
+    this.playNoise(t, 0.03, 'highpass', 2500, 2500, 0.1, this.master);
+  },
+  reloadSfx(){
+    if(!this.ctx) return;
+    const t = this.ctx.currentTime;
+    this.playNoise(t+0.5, 0.03, 'highpass', 1800, 1800, 0.3, this.master);
+    this.playTone(t+0.5, 0.02, 'square', 900, 700, 0.12, this.master);
+    this.playNoise(t+0.92, 0.04, 'bandpass', 700, 500, 0.32, this.master);
+    this.playNoise(t+1.24, 0.11, 'bandpass', 420, 900, 0.3, this.master);
+  },
+  boom(){
+    if(!this.ctx) return;
+    const t = this.ctx.currentTime;
+    this.playTone(t, 0.7, 'sine', 62, 30, 0.55, this.master);
+    this.playNoise(t, 0.4, 'lowpass', 220, 100, 0.22, this.master);
+  },
+  bite(){
+    if(!this.ctx) return;
+    const t = this.ctx.currentTime;
+    this.playNoise(t, 0.08, 'bandpass', 900, 500, 0.9, this.master, 1.5);
+    this.playNoise(t+0.12, 0.1, 'bandpass', 600, 300, 0.95, this.master, 1.5);
+    this.playTone(t, 0.9, 'sawtooth', 90, 30, 0.8, this.master);
+    this.playTone(t+0.05, 1.4, 'sine', 40, 26, 0.55, this.master);
+  },
+  chime(){
+    if(!this.ctx) return;
+    const t = this.ctx.currentTime;
+    this.playTone(t, 0.4, 'sine', 660, 660, 0.14, this.master);
+    this.playTone(t+0.12, 0.5, 'sine', 990, 990, 0.1, this.master);
+  },
+  ui(){ if(this.ctx) this.playTone(this.ctx.currentTime, 0.03, 'square', 660, 500, 0.08, this.master); },
+  testPan(){
+    if(!this.ctx) return;
+    const seq = [[-90,'gauche…'],[0,'devant…'],[90,'droite…']];
+    seq.forEach(([az,txt],i) => {
+      setTimeout(()=>{
+        const c=this.ctx, t=c.currentTime;
+        const p=this.panner();
+        this.setPos(p, Math.sin(az*D2R)*3, 0, -Math.cos(az*D2R)*3);
+        p.connect(this.master);
+        this.playTone(t, 0.25, 'sine', 520, 500, 0.5, p);
+        showSub(txt, 700);
+      }, i*750);
+    });
+  },
+  setTension(v){ if(this.tensionG) this.tensionG.gain.value = v; }
+};
+
+// voix spatialisée d'un monstre
+class Voice {
+  constructor(){
+    const c = AU.ctx;
+    this.ok = !!c;
+    if(!this.ok) return;
+    this.pan = AU.panner();
+    this.filt = c.createBiquadFilter(); this.filt.type='lowpass'; this.filt.frequency.value=1500;
+    this.in = c.createGain(); this.in.gain.value = 1;
+    this.in.connect(this.filt); this.filt.connect(this.pan); this.pan.connect(AU.master);
+    this.echoG = c.createGain(); this.echoG.gain.value = 0.4;
+    this.pan.connect(this.echoG); this.echoG.connect(AU.echoIn);
+    // grognement / respiration continue
+    this.gr = c.createOscillator(); this.gr.type='sawtooth';
+    this.grF0 = rand(56,76); this.gr.frequency.value = this.grF0;
+    const glp = c.createBiquadFilter(); glp.type='lowpass'; glp.frequency.value=240;
+    this.grG = c.createGain(); this.grG.gain.value = 0.05;
+    this.lfo = c.createOscillator(); this.lfo.type='sine'; this.lfo.frequency.value = rand(0.26,0.4);
+    this.lfoG = c.createGain(); this.lfoG.gain.value = 0.035;
+    this.lfo.connect(this.lfoG); this.lfoG.connect(this.grG.gain);
+    this.gr.connect(glp); glp.connect(this.grG); this.grG.connect(this.in);
+    this.gr.start(); this.lfo.start();
+  }
+  setPos(az, dist){
+    if(!this.ok) return;
+    AU.setPos(this.pan, Math.sin(az*D2R)*dist, 1.1, -Math.cos(az*D2R)*dist);
+    this.filt.frequency.value = 500 + 5800*Math.pow(clamp(1-dist/26,0,1),1.6);
+  }
+  step(running){
+    if(!this.ok) return;
+    const t = AU.now();
+    AU.playNoise(t, 0.08, 'bandpass', rand(130,280), 100, running?0.8:0.55, this.in, 0.9);
+    AU.playTone(t, 0.09, 'sine', 84, 44, 0.3, this.in);
+  }
+  shriek(){
+    if(!this.ok) return;
+    const c=AU.ctx, t=c.currentTime;
+    const o=c.createOscillator(); o.type='sawtooth';
+    o.frequency.setValueAtTime(260,t);
+    o.frequency.exponentialRampToValueAtTime(840,t+0.18);
+    o.frequency.exponentialRampToValueAtTime(160,t+0.55);
+    const lp=c.createBiquadFilter(); lp.type='lowpass'; lp.frequency.value=1900;
+    const gn=c.createGain();
+    gn.gain.setValueAtTime(0.55,t);
+    gn.gain.exponentialRampToValueAtTime(0.001,t+0.6);
+    o.connect(lp); lp.connect(gn); gn.connect(this.in);
+    o.start(t); o.stop(t+0.65);
+    AU.playNoise(t, 0.3, 'bandpass', 1500, 700, 0.28, this.in, 1.2);
+    // le grognement s'énerve
+    this.gr.frequency.setTargetAtTime(this.grF0*1.5, t, 0.3);
+    this.lfo.frequency.setTargetAtTime(1.1, t, 0.3);
+    this.grG.gain.setTargetAtTime(0.11, t, 0.3);
+  }
+  hurt(){
+    if(!this.ok) return;
+    const t = AU.now();
+    AU.playTone(t, 0.22, 'sawtooth', 210, 90, 0.5, this.in);
+    AU.playNoise(t, 0.12, 'bandpass', 600, 300, 0.3, this.in);
+  }
+  roar(){
+    if(!this.ok) return;
+    const t = AU.now();
+    AU.playTone(t, 1.05, 'sawtooth', 125, 36, 0.95, this.in);
+    AU.playNoise(t, 0.9, 'lowpass', 450, 180, 0.5, this.in);
+  }
+  death(){
+    if(!this.ok) return;
+    const t = AU.now();
+    AU.playTone(t, 0.85, 'sawtooth', 470, 50, 0.75, this.in);
+    AU.playNoise(t, 0.3, 'bandpass', 950, 300, 0.4, this.in, 1.2);
+    this.grG.gain.setTargetAtTime(0, t, 0.1);
+    const self=this;
+    setTimeout(()=>self.dispose(), 1400);
+  }
+  dispose(){
+    if(!this.ok || this.disposed) return;
+    this.disposed = true;
+    try{ this.gr.stop(); this.lfo.stop(); }catch(e){}
+    try{ this.in.disconnect(); this.pan.disconnect(); this.echoG.disconnect(); }catch(e){}
+  }
+}
+
+// ---------------- monstre ----------------
+class Monster {
+  constructor(opts){
+    opts = opts||{};
+    this.az = opts.az!=null ? opts.az : rand(0,360);
+    this.dist = opts.dist!=null ? opts.dist : rand(15,22);
+    this.walkSpeed = opts.speed!=null ? opts.speed : Math.min(2.6, 1.05 + game.wave*0.11 + rand(0,0.15));
+    this.frozen = !!opts.frozen;
+    this.slow = 1; this.state = 'walk'; this.stateT = rand(1.5,3.5);
+    this.staggerT = 0; this.revealT = 0; this.windupT = 0;
+    this.aggro = false; this.alerted = false;
+    this.dead = false; this.deadT = 0;
+    this.phase = Math.random(); this.seed = Math.random();
+    this.drift = rand(-4,4);
+    this.speedNow = 0;
+    this.voice = new Voice();
+    this.nextStep = AU.now() + Math.random()*0.6;
+    this.voice.setPos(this.az, this.dist);
+  }
+  enrage(){
+    if(this.aggro || this.dead || this.frozen) return;
+    this.aggro = true;
+    this.voice.shriek();
+    showSeen();
+  }
+  windup(){
+    if(this.state==='windup') return;
+    this.state = 'windup'; this.windupT = 1.15;
+    this.voice.roar(); shake = Math.min(1.4, shake+0.7);
+  }
+  update(dt){
+    if(this.dead){ this.deadT += dt; return; }
+    if(this.frozen){ this.voice.setPos(this.az, this.dist); return; }
+    this.revealT = Math.max(0, this.revealT - dt);
+    if(this.state==='windup'){
+      this.windupT -= dt;
+      if(this.windupT<=0) devour(this);
+      this.voice.setPos(this.az, this.dist);
+      return;
+    }
+    if(this.staggerT>0){ this.staggerT -= dt; this.voice.setPos(this.az, this.dist); return; }
+    // détection : ta lumière te trahit
+    if(!this.aggro){
+      const eff = game.effLight;
+      const seen = eff>0.45 && this.dist < 5 + eff*13;
+      if((seen && Math.random() < dt*(0.25+eff)) || this.dist<3.4 || (this.alerted && this.dist<9)){
+        this.enrage();
+      }
+    }
+    let sp = this.walkSpeed * this.slow * (this.aggro ? 2.05 : (this.alerted ? 1.18 : 1));
+    if(!this.aggro){
+      this.stateT -= dt;
+      if(this.state==='walk' && this.stateT<=0){ this.state='pause'; this.stateT=rand(0.7,2.2); }
+      else if(this.state==='pause' && this.stateT<=0){ this.state='walk'; this.stateT=rand(1.5,4); }
+      if(this.state==='pause') sp = 0;
+      if(this.dist>6) this.az = wrapDeg(this.az + this.drift*dt);
+    }
+    this.dist -= sp*dt;
+    this.speedNow = sp;
+    if(sp>0) this.phase += sp*dt/0.85;
+    if(sp>0 && AU.ctx && AU.now()>=this.nextStep){
+      this.voice.step(this.aggro);
+      const period = clamp(0.85/Math.max(0.4,sp), 0.24, 1.1);
+      this.nextStep = AU.now() + period*rand(0.9,1.1);
+    }
+    if(this.dist<=1.25) this.windup();
+    this.voice.setPos(this.az, this.dist);
+  }
+  // 'head' | 'body' | null — visée en degrés
+  hitTest(){
+    if(this.dead) return null;
+    const d = Math.max(0.4, this.dist);
+    const dy = angDiff(this.az, view.yaw);
+    const elev = h => Math.atan2(h-EYE, d)/D2R;
+    const headR = Math.max(2.3, Math.atan2(0.34,d)/D2R);
+    if(Math.abs(dy)<=headR && Math.abs(view.pitch - elev(1.56))<=headR) return 'head';
+    const bodyR = Math.max(3, Math.atan2(0.45,d)/D2R);
+    if(Math.abs(dy)<=bodyR && view.pitch>=elev(0.1)-1.5 && view.pitch<=elev(1.42)+1) return 'body';
+    return null;
+  }
+  onHit(zone){
+    if(zone==='head'){
+      this.die();
+    }else{
+      this.slow = Math.max(0.45, this.slow*0.7);
+      this.dist = Math.min(this.dist+1.6, 24);
+      this.staggerT = 0.9;
+      this.revealT = 2.5;
+      if(this.state==='windup') this.state = 'walk';   // repoussé : l'attaque est annulée
+      this.voice.hurt();
+      floatAt(this, 'RALENTI', 'grey');
+      if(game.state==='tuto' && tuto.step===3) showSub('Le corps ne suffit pas — vise la tête.', 2200);
+    }
+  }
+  die(){
+    if(this.dead) return;
+    this.dead = true; this.deadT = 0;
+    this.voice.death();
+    timeScale = 0.3;
+    if(game.state==='tuto'){
+      tutoKill();
+    }else{
+      game.kills++;
+      const pts = 100 + 10*game.wave;
+      game.score += pts;
+      floatAt(this, '+'+pts, '');
+    }
+  }
+}
+
+// ---------------- état du jeu ----------------
+const game = {
+  state:'menu',            // menu | tuto | playing | dying | over
+  wave:0, score:0, kills:0,
+  best:+(store.get('bf_best')||0),
+  monsters:[], queue:0, nextSpawn:0, waveBreakT:0, cleared:false,
+  effLight:0, dyingM:null, dyingT:0, aimHot:false,
+};
+const tuto = {step:0, t:0, prog:0, az:0};
+const view = {yaw:0, pitch:-34};
+const hb = {next:0, pulse:0};
+const amb = {nextDrip:2};
+
+let T = 0, lastTs = 0, timeScale = 1;
+let loaded = true, reloadT = 0;
+let flash = 0, recoil = 0, shake = 0;
+let danger = 0;
+let msgTimer = null, subTimer = null, seenT = 0;
+let reducedFlash = false;
+
+// particules de poussière (pseudo-3D)
+const dust = [];
+for(let i=0;i<44;i++) dust.push({az:rand(0,360), d:rand(0.8,6), h:rand(0.1,2.3), vh:rand(-0.05,0.08), va:rand(-3,3)});
+
+// ---------------- UI helpers ----------------
+function showMsg(txt, dur, blood){
+  elMsg.textContent = txt;
+  elMsg.classList.toggle('blood', !!blood);
+  elMsg.classList.add('show');
+  clearTimeout(msgTimer);
+  if(dur) msgTimer = setTimeout(()=>elMsg.classList.remove('show'), dur);
+}
+function showSub(txt, dur){
+  elSub.textContent = txt;
+  elSub.classList.add('show');
+  clearTimeout(subTimer);
+  if(dur) subTimer = setTimeout(()=>elSub.classList.remove('show'), dur);
+}
+function hideTexts(){
+  elMsg.classList.remove('show'); elSub.classList.remove('show');
+  clearTimeout(msgTimer); clearTimeout(subTimer);
+}
+function showSeen(){ seenT = 2.2; }
+function floatAt(m, txt, cls){
+  const d = Math.max(0.4, m.dist);
+  const f = (H/2)/Math.tan(31*D2R);
+  const dy = angDiff(m.az, view.yaw);
+  if(Math.abs(dy)>50) return;
+  const x = W/2 + Math.tan(dy*D2R)*f;
+  const y = H/2 - Math.tan(Math.atan2(1.56-EYE,d) - view.pitch*D2R)*f;
+  const el = document.createElement('div');
+  el.className = 'float'+(cls?' '+cls:'');
+  el.textContent = txt;
+  el.style.left = clamp(x,40,W-40)+'px';
+  el.style.top = clamp(y,60,H-120)+'px';
+  $('game').appendChild(el);
+  setTimeout(()=>el.remove(), 1000);
+}
+
+// ---------------- déroulement ----------------
+function resetRun(){
+  game.monsters.forEach(m => m.voice.dispose());
+  game.monsters.length = 0;
+  game.score = 0; game.kills = 0; game.wave = 0;
+  game.queue = 0; game.waveBreakT = 0; game.dyingM = null;
+  loaded = true; reloadT = 0; flash = 0; recoil = 0; shake = 0; timeScale = 1;
+  hb.next = T + 0.6;
+  hideTexts();
+}
+function waveCount(n){ return Math.min(9, 1 + Math.floor((n-1)*0.8)); }
+function maxSimul(n){ return n>=6 ? 3 : n>=3 ? 2 : 1; }
+
+function startSurvival(){
+  resetRun();
+  game.state = 'playing';
+  beginWave(1);
+}
+function beginWave(n){
+  game.wave = n; game.queue = waveCount(n); game.cleared = false;
+  game.nextSpawn = T + 1.6;
+  showMsg('VAGUE '+n, 2000);
+  AU.boom();
+}
+function waveCleared(){
+  game.cleared = true;
+  game.score += 40 + 10*game.wave;
+  game.waveBreakT = 4;
+  showMsg('VAGUE '+game.wave+' NETTOYÉE', 1900);
+  showSub('Récupère ton souffle…', 1900);
+  AU.chime();
+}
+function devour(m){
+  if(game.state==='dying') return;
+  const wasTuto = game.state==='tuto';
+  game.state = 'dying'; game.dyingM = m; game.dyingT = 0;
+  game._backToTuto = wasTuto;
+  AU.bite(); shake = 1.6;
+}
+function finishDeath(){
+  game.dyingM && game.dyingM.voice.dispose();
+  if(game._backToTuto){
+    // on retente l'étape 4 du tutoriel
+    game.monsters.forEach(m => m.voice.dispose());
+    game.monsters.length = 0;
+    game.dyingM = null;
+    game.state = 'tuto';
+    showMsg('IL T’A EU', 1800, true);
+    showSub('Écoute mieux. Réessaie.', 2400);
+    setTimeout(()=>{ if(game.state==='tuto') tutoStep(4); }, 2000);
+    return;
+  }
+  gameOver();
+}
+function gameOver(){
+  game.monsters.forEach(m => m.voice.dispose());
+  game.state = 'over';
+  AU.setTension(0);
+  const isRec = game.score > game.best;
+  if(isRec){ game.best = game.score; store.set('bf_best', game.best); }
+  elStats.innerHTML =
+    'Vague atteinte : <em>'+game.wave+'</em><br>' +
+    'Monstres abattus : <em>'+game.kills+'</em><br>' +
+    'Score : <em>'+game.score+'</em>' +
+    (isRec ? '<br><span class="rec">Nouveau record</span>' : '<br>Record : '+game.best);
+  elHud.classList.add('hidden');
+  elFire.classList.add('hidden');
+  elOver.classList.remove('hidden');
+}
+function showMenu(){
+  game.state = 'menu';
+  resetRun();
+  elBest.textContent = game.best>0 ? 'Record : '+game.best : '';
+  elOver.classList.add('hidden');
+  elHud.classList.add('hidden');
+  elFire.classList.add('hidden');
+  elMenu.classList.remove('hidden');
+}
+
+// ---------------- tutoriel ----------------
+function startTuto(){
+  resetRun();
+  game.state = 'tuto';
+  tutoStep(1);
+}
+function tutoStep(n){
+  tuto.step = n; tuto.t = 0; tuto.prog = 0;
+  elProgF.style.width = '0%';
+  elProg.classList.add('hidden');
+  if(n===1){
+    tuto.az = wrapDeg(Input.yaw + rand(100,220));
+    showMsg('ÉCOUTE');
+    showSub('Quelque chose goutte dans le noir. Tourne-toi vers le son et garde-le devant toi.');
+    elProg.classList.remove('hidden');
+  }else if(n===2){
+    showMsg('LUMIÈRE');
+    showSub('Lève lentement ton téléphone : la lumière révèle la pièce… et ta position.');
+    elProg.classList.remove('hidden');
+  }else if(n===3){
+    showMsg('TIRE');
+    showSub('Une silhouette, droit devant. Vise la TÊTE et appuie sur le bouton.');
+    game.monsters.push(new Monster({az:view.yaw, dist:7, frozen:true}));
+  }else if(n===4){
+    showMsg('SURVIS');
+    showSub('Il arrive. Écoute-le. Éclaire-le. Abats-le.');
+    game.monsters.push(new Monster({az:wrapDeg(view.yaw + rand(-120,120)), dist:13, speed:0.55}));
+  }
+}
+function tutoKill(){
+  if(tuto.step===3){
+    AU.chime();
+    setTimeout(()=>{ if(game.state==='tuto') tutoStep(4); }, 1300);
+  }else if(tuto.step===4){
+    store.set('bf_tuto','1');
+    showMsg('TU ES PRÊT', 2200);
+    showSub('La chasse commence.', 2200);
+    AU.chime();
+    setTimeout(()=>{ if(game.state==='tuto') startSurvival(); }, 2400);
+    tuto.step = 5;
+  }
+}
+function tutoUpdate(dt){
+  tuto.t += dt;
+  if(tuto.step===1){
+    const facing = Math.abs(angDiff(tuto.az, view.yaw)) < 16;
+    tuto.prog = clamp(tuto.prog + (facing ? dt : -dt*1.5), 0, 1.1);
+    elProgF.style.width = Math.min(100, tuto.prog*100)+'%';
+    if(tuto.prog>=1.1){
+      AU.chime();
+      showSub('Bien. Tes oreilles sont ton radar.', 1600);
+      elProg.classList.add('hidden');
+      tuto.step = 1.5; tuto.t = 0;
+    }
+  }else if(tuto.step===1.5){
+    if(tuto.t>1.7) tutoStep(2);
+  }else if(tuto.step===2){
+    const lit = lightLevel() > 0.82;
+    tuto.prog = clamp(tuto.prog + (lit ? dt*2 : -dt), 0, 1.1);
+    elProgF.style.width = Math.min(100, tuto.prog*100)+'%';
+    if(tuto.prog>=1.1){
+      AU.chime();
+      showSub('Tu vois. Mais tout ce qui rôde te voit aussi.', 2000);
+      elProg.classList.add('hidden');
+      tuto.step = 2.5; tuto.t = 0;
+    }
+  }else if(tuto.step===2.5){
+    if(tuto.t>2.1) tutoStep(3);
+  }
+}
+
+// ---------------- tir ----------------
+let lastFire = 0;
+function fireGun(){
+  if(game.state!=='playing' && game.state!=='tuto') return;
+  const now = performance.now();
+  if(now-lastFire<130) return;
+  lastFire = now;
+  if(!loaded){ AU.dry(); return; }
+  loaded = false; reloadT = RELOAD;
+  AU.shot(); AU.reloadSfx();
+  flash = 1; recoil = 1; shake = Math.min(1, shake+0.45);
+  let hit = null, zone = null;
+  for(const m of game.monsters){
+    if(m.dead) continue;
+    const z = m.hitTest();
+    if(z && (!hit || m.dist<hit.dist)){ hit = m; zone = z; }
+  }
+  if(hit) hit.onHit(zone);
+  // tout le monde a entendu le coup de feu
+  for(const m of game.monsters){
+    if(m.dead || m===hit || m.frozen) continue;
+    m.alerted = true;
+    if(m.dist<11) m.enrage();
+  }
+}
+elFire.addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); fireGun(); });
+
+// ---------------- lumière ----------------
+// Téléphone à la verticale (pitch 0) = lumière maximale ; baissé de 45° = noir total.
+function lightLevel(){ return clamp((view.pitch + 46)/44, 0, 1); }
+function lightAt(d, m){
+  let v = game.effLight * clamp(1 - d/LIGHT_RANGE, 0, 1);
+  if(m && m.revealT>0) v += 0.5*Math.min(1, m.revealT);
+  return clamp(v, 0, 1);
+}
+
+// ---------------- simulation ----------------
+function sim(dt){
+  if(reloadT>0){
+    reloadT -= dt;
+    if(reloadT<=0){ loaded = true; }
+  }
+  if(game.state==='dying'){
+    game.dyingT += dt;
+    const m = game.dyingM;
+    if(m) m.dist = Math.max(0.38, m.dist - dt*4.5);
+    if(game.dyingT>1.15) finishDeath();
+    return;
+  }
+  if(game.state==='tuto') tutoUpdate(dt);
+  for(const m of game.monsters) m.update(dt);
+  // purge des cadavres
+  for(let i=game.monsters.length-1;i>=0;i--){
+    const m = game.monsters[i];
+    if(m.dead && m.deadT>0.5) game.monsters.splice(i,1);
+  }
+  if(game.state==='playing'){
+    if(game.cleared){
+      game.waveBreakT -= dt;
+      if(game.waveBreakT<=0) beginWave(game.wave+1);
+    }else{
+      const alive = game.monsters.filter(m=>!m.dead).length;
+      if(game.queue>0 && alive<maxSimul(game.wave) && T>=game.nextSpawn){
+        game.monsters.push(new Monster({}));
+        game.queue--;
+        game.nextSpawn = T + rand(3,6.5);
+      }
+      if(game.queue===0 && alive===0) waveCleared();
+    }
+  }
+  // le viseur "sent" une tête éclairée
+  game.aimHot = false;
+  for(const m of game.monsters){
+    if(!m.dead && m.hitTest()==='head' && lightAt(m.dist,m)>0.22){ game.aimHot = true; break; }
+  }
+}
+
+// ---------------- audio par trame ----------------
+function audioFrame(){
+  if(!AU.ctx) return;
+  AU.listen(view.yaw);
+  const active = game.state==='playing' || game.state==='tuto' || game.state==='dying';
+  // danger = proximité du plus proche
+  let nd = 99;
+  for(const m of game.monsters) if(!m.dead && !m.frozen) nd = Math.min(nd, m.dist);
+  const target = active && nd<99 ? clamp(1 - nd/18, 0, 1) : 0;
+  danger += (target-danger)*0.06;
+  AU.setTension(Math.pow(danger,2)*0.05);
+  if(active && T>=hb.next){
+    AU.thump(0.1 + 0.42*danger);
+    hb.next = T + lerp(1.3, 0.34, Math.pow(danger,1.25));
+    hb.pulse = 1;
+  }
+  // gouttes d'ambiance (guidées à l'étape 1 du tutoriel)
+  if(T>=amb.nextDrip){
+    if(game.state==='tuto' && tuto.step===1){
+      AU.drip(tuto.az, 7);
+      amb.nextDrip = T + 1.25;
+    }else{
+      AU.drip(rand(0,360), rand(5,14));
+      amb.nextDrip = T + rand(5,11);
+    }
+  }
+}
+
+// ---------------- rendu ----------------
+function project(az, h, dist){
+  const f = (H/2)/Math.tan(31*D2R);
+  const dy = angDiff(az, view.yaw);
+  const rp = Math.atan2(h-EYE, dist) - view.pitch*D2R;
+  return {
+    x: W/2 + Math.tan(clamp(dy,-80,80)*D2R)*f,
+    y: H/2 - Math.tan(clamp(rp, -1.3, 1.3))*f,
+    f: f, dy: dy
+  };
+}
+
+function render(light){
+  g.setTransform(dpr,0,0,dpr,0,0);
+  g.fillStyle = '#020204';
+  g.fillRect(0,0,W,H);
+  const shakeAmp = reducedFlash ? 5 : 13;
+  if(shake>0.01) g.translate((Math.random()-0.5)*shake*shakeAmp, (Math.random()-0.5)*shake*shakeAmp);
+
+  const el = game.effLight;
+  const f = (H/2)/Math.tan(31*D2R);
+
+  // halo de ta lampe
+  if(el>0.02){
+    let gr = g.createRadialGradient(W/2, H*0.88, 10, W/2, H*0.88, H*(0.3+0.8*el));
+    gr.addColorStop(0, 'rgba(201,185,138,'+(0.05+0.17*el).toFixed(3)+')');
+    gr.addColorStop(1, 'rgba(201,185,138,0)');
+    g.fillStyle = gr; g.fillRect(0,0,W,H);
+    gr = g.createRadialGradient(W/2, H*0.45, 10, W/2, H*0.45, H*0.85*el);
+    gr.addColorStop(0, 'rgba(190,178,140,'+(0.055*el).toFixed(3)+')');
+    gr.addColorStop(1, 'rgba(190,178,140,0)');
+    g.fillStyle = gr; g.fillRect(0,0,W,H);
+  }
+
+  // lignes de sol (profondeur)
+  if(el>0.03){
+    for(let d=2; d<=14; d+=2){
+      const rp = Math.atan2(-EYE,d) - view.pitch*D2R;
+      if(Math.abs(rp)>1.2) continue;
+      const y = H/2 - Math.tan(rp)*f;
+      if(y<0||y>H) continue;
+      const a = el*(1-d/15)*0.14;
+      if(a<=0.004) continue;
+      const gr = g.createLinearGradient(0,y,W,y);
+      gr.addColorStop(0,'rgba(201,185,138,0)');
+      gr.addColorStop(0.5,'rgba(201,185,138,'+a.toFixed(3)+')');
+      gr.addColorStop(1,'rgba(201,185,138,0)');
+      g.strokeStyle = gr; g.lineWidth = 1;
+      g.beginPath(); g.moveTo(0,y); g.lineTo(W,y); g.stroke();
+    }
+  }
+
+  // poussière
+  if(el>0.03){
+    g.fillStyle = 'rgba(210,196,160,0.5)';
+    for(const p of dust){
+      p.h += p.vh*0.016; p.az += p.va*0.016;
+      if(p.h>2.4) p.h = 0.05;
+      if(p.h<0) p.h = 2.3;
+      const pr = project(p.az, p.h, p.d);
+      if(Math.abs(pr.dy)>40 || pr.y<0 || pr.y>H) continue;
+      const a = el*(1-p.d/7)*0.5;
+      if(a<=0.02) continue;
+      g.globalAlpha = a;
+      g.fillRect(pr.x, pr.y, 1.6, 1.6);
+    }
+    g.globalAlpha = 1;
+  }
+
+  // monstres (du plus loin au plus proche)
+  const sorted = game.monsters.slice().sort((a,b)=>b.dist-a.dist);
+  for(const m of sorted) drawMonster(m);
+
+  // flash de bouche
+  if(flash>0.02 && !reducedFlash){
+    const gy = H-64;
+    const gr = g.createRadialGradient(W/2, gy-46, 4, W/2, gy-46, H*1.05*flash);
+    gr.addColorStop(0, 'rgba(255,232,180,'+(0.5*flash).toFixed(3)+')');
+    gr.addColorStop(0.25, 'rgba(255,170,90,'+(0.22*flash).toFixed(3)+')');
+    gr.addColorStop(1, 'rgba(255,150,60,0)');
+    g.globalCompositeOperation = 'lighter';
+    g.fillStyle = gr; g.fillRect(0,0,W,H);
+    g.globalCompositeOperation = 'source-over';
+  }
+
+  drawGun(light);
+  drawCross(light);
+
+  // vignette + pulsation cardiaque
+  let gr = g.createRadialGradient(W/2,H/2, Math.min(W,H)*0.32, W/2,H/2, Math.max(W,H)*0.75);
+  gr.addColorStop(0,'rgba(0,0,0,0)');
+  gr.addColorStop(1,'rgba(0,0,0,0.82)');
+  g.fillStyle = gr; g.fillRect(0,0,W,H);
+  const redA = hb.pulse*danger*0.3 + (game.state==='dying' ? Math.min(0.75, game.dyingT*0.9) : 0);
+  if(redA>0.01){
+    gr = g.createRadialGradient(W/2,H/2, Math.min(W,H)*0.2, W/2,H/2, Math.max(W,H)*0.72);
+    gr.addColorStop(0,'rgba(120,6,8,0)');
+    gr.addColorStop(1,'rgba(120,6,8,'+redA.toFixed(3)+')');
+    g.fillStyle = gr; g.fillRect(0,0,W,H);
+  }
+  if(game.state==='dying' && game.dyingT>0.95){
+    g.fillStyle = 'rgba(0,0,0,'+clamp((game.dyingT-0.95)*6,0,1)+')';
+    g.fillRect(0,0,W,H);
+  }
+}
+
+function drawMonster(m){
+  const d = Math.max(0.38, m.dist);
+  const dy = angDiff(m.az, view.yaw);
+  if(Math.abs(dy)>62) return;
+  const la = lightAt(d, m);
+  const eyeFlk = 0.55 + 0.45*Math.sin(T*5.3 + m.seed*9);
+  let eyeA = clamp((1 - d/14)*eyeFlk + la*0.4, 0, 1);
+  if(m.state==='windup') eyeA = 1;
+  if(la<0.015 && eyeA<0.03 && m.revealT<=0) return;
+
+  const feet = project(m.az, 0, d);
+  const k = feet.f/d;
+  const br = la;
+  const col = 'rgb('+Math.round(10+br*92)+','+Math.round(9+br*80)+','+Math.round(11+br*70)+')';
+
+  const wind = m.state==='windup';
+  const dead = m.dead;
+  const sq = dead ? Math.max(0.12, 1-m.deadT*2.4) : 1;   // effondrement
+  const swing = Math.sin(m.phase*TAU) * (m.aggro?0.3:0.16) * (m.speedNow>0?1:0.15);
+  const jit = wind ? (Math.random()-0.5)*0.05 : 0;
+
+  g.save();
+  g.translate(feet.x + jit*k, feet.y);
+  g.scale(k, -k*sq);
+  g.lineCap = 'round'; g.lineJoin = 'round';
+  g.fillStyle = col; g.strokeStyle = col;
+
+  // jambes
+  g.lineWidth = 0.09;
+  g.beginPath();
+  g.moveTo(-0.09, 0.95); g.quadraticCurveTo(-0.16, 0.5, -0.13 + swing*0.5, 0.02);
+  g.moveTo(0.09, 0.95);  g.quadraticCurveTo(0.16, 0.5, 0.13 - swing*0.5, 0.02);
+  g.stroke();
+  // torse + tête (silhouette)
+  g.beginPath();
+  g.moveTo(-0.17, 0.92);
+  g.quadraticCurveTo(-0.3, 1.25, -0.21, 1.44);
+  g.quadraticCurveTo(-0.12, 1.52, -0.1, 1.47);
+  g.lineTo(0.1, 1.47);
+  g.quadraticCurveTo(0.12, 1.52, 0.21, 1.44);
+  g.quadraticCurveTo(0.3, 1.25, 0.17, 0.92);
+  g.closePath(); g.fill();
+  const headY = 1.56 + Math.sin(m.phase*TAU*2)*0.015;
+  g.beginPath(); g.arc(0, headY, 0.145, 0, TAU); g.fill();
+  if(wind){ // mâchoire ouverte
+    g.beginPath(); g.ellipse(0, headY-0.16, 0.08, 0.11, 0, 0, TAU); g.fill();
+  }
+  // bras
+  g.lineWidth = 0.07;
+  g.beginPath();
+  if(wind || (game.state==='dying' && m===game.dyingM)){
+    g.moveTo(-0.2, 1.42); g.quadraticCurveTo(-0.5, 1.6, -0.62, 1.85);
+    g.moveTo(0.2, 1.42);  g.quadraticCurveTo(0.5, 1.6, 0.62, 1.85);
+  }else if(m.aggro){
+    g.moveTo(-0.2, 1.4); g.quadraticCurveTo(-0.42, 1.15, -0.5, 0.95);
+    g.moveTo(0.2, 1.4);  g.quadraticCurveTo(0.42, 1.15, 0.5, 0.95);
+  }else{
+    g.moveTo(-0.2, 1.4); g.quadraticCurveTo(-0.36, 0.95, -0.33 - swing*0.2, 0.5);
+    g.moveTo(0.2, 1.4);  g.quadraticCurveTo(0.36, 0.95, 0.33 + swing*0.2, 0.5);
+  }
+  g.stroke();
+  // griffes
+  g.lineWidth = 0.035;
+  const clawY = (wind||game.state==='dying'&&m===game.dyingM) ? 1.85 : (m.aggro?0.95:0.5);
+  const clawX = (wind||game.state==='dying'&&m===game.dyingM) ? 0.62 : (m.aggro?0.5:0.33);
+  for(const s of [-1,1]){
+    g.beginPath();
+    for(let i=-1;i<=1;i++){
+      g.moveTo(s*clawX, clawY);
+      g.lineTo(s*clawX + i*0.05, clawY - 0.13);
+    }
+    g.stroke();
+  }
+  // contour "révélé" (touché au corps)
+  if(m.revealT>0 && !dead){
+    g.strokeStyle = 'rgba(224,54,44,'+(0.5*Math.min(1,m.revealT)).toFixed(3)+')';
+    g.lineWidth = 0.022;
+    g.beginPath(); g.arc(0, headY, 0.165, 0, TAU); g.stroke();
+    g.beginPath();
+    g.moveTo(-0.19, 0.92); g.quadraticCurveTo(-0.32, 1.25, -0.23, 1.46);
+    g.moveTo(0.19, 0.92);  g.quadraticCurveTo(0.32, 1.25, 0.23, 1.46);
+    g.stroke();
+  }
+  g.restore();
+
+  // yeux (repère glaçant dans le noir)
+  if(eyeA>0.02 && !dead){
+    const exOff = 0.052*k, eyY = feet.y - (1.58)*k*sq;
+    const r = Math.max(1, 0.02*k);
+    g.fillStyle = wind ? 'rgba(255,70,50,'+eyeA.toFixed(3)+')' : 'rgba(255,233,184,'+(eyeA*0.9).toFixed(3)+')';
+    g.beginPath(); g.arc(feet.x-exOff, eyY, r, 0, TAU); g.arc(feet.x+exOff, eyY, r, 0, TAU); g.fill();
+  }
+}
+
+function drawGun(light){
+  const rec = recoil*20;
+  const gy = H - 46 + rec;
+  const a = 0.55 + 0.45*Math.min(1, light + flash);
+  g.save();
+  g.translate(W/2, gy);
+  // fût
+  g.fillStyle = 'rgba(9,9,13,'+a.toFixed(3)+')';
+  g.beginPath();
+  g.moveTo(-30, 60); g.lineTo(-16, -18); g.lineTo(16, -18); g.lineTo(30, 60);
+  g.closePath(); g.fill();
+  // canon
+  g.fillRect(-8, -52, 16, 40);
+  // arête éclairée par ta lampe
+  g.strokeStyle = 'rgba(201,185,138,'+(0.1+0.4*light).toFixed(3)+')';
+  g.lineWidth = 1.5;
+  g.beginPath(); g.moveTo(-8, -52); g.lineTo(-8, -14); g.stroke();
+  g.beginPath(); g.moveTo(-16, -17); g.lineTo(-29, 58); g.stroke();
+  g.restore();
+}
+
+function drawCross(light){
+  const a = 0.1 + 0.72*light;
+  const cx = W/2, cy = H/2;
+  g.strokeStyle = game.aimHot ? 'rgba(224,54,44,'+a.toFixed(3)+')' : 'rgba(210,200,180,'+a.toFixed(3)+')';
+  g.lineWidth = 1.4;
+  g.beginPath(); g.arc(cx, cy, 15, 0, TAU); g.stroke();
+  g.beginPath();
+  for(const [dx,dy] of [[0,-1],[0,1],[-1,0],[1,0]]){
+    g.moveTo(cx+dx*9, cy+dy*9); g.lineTo(cx+dx*20, cy+dy*20);
+  }
+  g.stroke();
+  if(game.aimHot){
+    g.fillStyle = 'rgba(224,54,44,'+Math.min(1,a+0.25).toFixed(3)+')';
+    g.beginPath(); g.arc(cx, cy, 2.6, 0, TAU); g.fill();
+  }
+}
+
+// ---------------- HUD ----------------
+function hud(light){
+  if(game.state==='playing' || game.state==='dying'){
+    elWave.textContent = game.wave>0 ? 'Vague '+game.wave : '';
+    elScore.textContent = game.score;
+  }else if(game.state==='tuto'){
+    elWave.textContent = 'Tutoriel';
+    elScore.textContent = '';
+  }
+  elMeter.style.height = Math.round(light*100)+'%';
+  elSeen.style.opacity = seenT>0 ? 1 : 0;
+  if(loaded){
+    elRing.style.background = 'conic-gradient(var(--blood) 360deg, transparent 0)';
+  }else{
+    const p = clamp(1 - reloadT/RELOAD, 0, 1);
+    elRing.style.background = 'conic-gradient(var(--blood) '+(p*360)+'deg, rgba(255,255,255,.08) 0)';
+  }
+}
+
+// ---------------- boucle principale ----------------
+function frame(ts){
+  requestAnimationFrame(frame);
+  fit();
+  if(!lastTs) lastTs = ts;
+  const rdt = Math.min(0.05, (ts-lastTs)/1000);
+  lastTs = ts;
+  T += rdt;
+  timeScale += (1-timeScale)*Math.min(1, rdt*5);
+  const dt = rdt*timeScale;
+
+  // visée = capteur + tremblement + recul
+  const s = Input.gyroActive ? 0.1 : 0.45;
+  const swY = Math.sin(T*0.9)*s + Math.sin(T*1.61)*s*0.6;
+  const swP = Math.sin(T*1.13)*s*0.8 + Math.sin(T*0.77)*s*0.5;
+  view.yaw = wrapDeg(Input.yaw + swY);
+  view.pitch = clamp(Input.pitch + swP + recoil*3.2, -80, 60);
+
+  flash = Math.max(0, flash - rdt*7);
+  recoil = Math.max(0, recoil - rdt*6);
+  shake = Math.max(0, shake - rdt*3.2);
+  hb.pulse *= Math.exp(-rdt*5);
+  seenT = Math.max(0, seenT - rdt);
+
+  const light = lightLevel();
+  game.effLight = clamp(light + flash*(reducedFlash?0.7:1.5) + 0.05, 0, 1.25);
+
+  if(game.state==='playing' || game.state==='tuto' || game.state==='dying') sim(dt);
+  audioFrame();
+  render(light);
+  hud(light);
+}
+requestAnimationFrame(frame);
+
+// ---------------- démarrage / boutons ----------------
+let wl = null;
+async function wakeLock(){
+  try{ if(navigator.wakeLock) wl = await navigator.wakeLock.request('screen'); }catch(e){}
+}
+document.addEventListener('visibilitychange', () => {
+  if(document.hidden){ AU.suspend(); }
+  else{ AU.resume(); wakeLock(); }
+});
+
+const elGate = $('gate'), elGStat = $('gStat');
+let pendingMode = 'surv';
+
+// La page d'aperçu claude.ai intègre le jeu dans un cadre qui bloque les
+// capteurs de mouvement sur iOS ; la version GitHub Pages est servie en direct.
+const PAGES_URL = 'https://thevisitappsolution-create.github.io/blindfire/';
+const FRAMED = (()=>{ try{ return window.self !== window.top; }catch(e){ return true; } })();
+const PAGES_LINK = '<br><a href="'+PAGES_URL+'">&#10132; Ouvrir la version «&nbsp;gyroscope&nbsp;» (github.io)</a>';
+
+function begin(mode){
+  AU.init(); AU.resume();
+  wakeLock();
+  if(Input.gyroActive){ launch(mode); return; }
+  pendingMode = mode;
+  elMenu.classList.add('hidden');
+  elOver.classList.add('hidden');
+  elGStat.textContent = '';
+  elGate.classList.remove('hidden');
+}
+function launch(mode){
+  elGate.classList.add('hidden');
+  elMenu.classList.add('hidden');
+  elOver.classList.add('hidden');
+  elHud.classList.remove('hidden');
+  elFire.classList.remove('hidden');
+  elCtl.textContent = Input.gyroActive
+    ? 'Contrôles : gyroscope ✓ — tourne-toi physiquement pour viser'
+    : 'Contrôles : tactile — glisse sur l’écran pour viser';
+  if(mode==='tuto') startTuto(); else startSurvival();
+}
+function waitForGyro(){
+  const t0 = performance.now();
+  elGStat.textContent = 'En attente des capteurs… bouge doucement ton téléphone.';
+  const iv = setInterval(()=>{
+    if(Input.gyroActive){
+      clearInterval(iv);
+      elGStat.textContent = 'Gyroscope actif ✓';
+      setTimeout(()=>launch(pendingMode), 500);
+    }else if(performance.now()-t0 > 2500){
+      clearInterval(iv);
+      elGStat.innerHTML = FRAMED
+        ? 'Aucune donnée capteur : cette page intégrée les bloque.'+PAGES_LINK
+        : 'Aucune donnée capteur reçue. Ouvre ce lien directement dans Safari '
+          + '(pas dans une autre app), puis réessaie — ou joue en mode tactile.';
+    }
+  }, 150);
+}
+$('bGyro').addEventListener('click', () => {
+  AU.init(); AU.resume();
+  try{
+    if(window.DeviceOrientationEvent && typeof DeviceOrientationEvent.requestPermission === 'function'){
+      // iOS 13+ : la demande DOIT partir d'un geste direct — c'est le cas ici.
+      DeviceOrientationEvent.requestPermission().then(r => {
+        if(r === 'granted'){
+          window.addEventListener('deviceorientation', onOrient, true);
+          waitForGyro();
+        }else{
+          elGStat.innerHTML = FRAMED
+            ? 'iOS bloque les capteurs dans cette page intégrée (refus automatique, '
+              + 'sans pop-up — ce n’est pas toi).'+PAGES_LINK
+            : 'Accès refusé par iOS. Quitte complètement Safari (balaye-la hors du '
+              + 'sélecteur d’apps), rouvre le lien, puis accepte '
+              + '«&nbsp;Mouvement et orientation&nbsp;».';
+        }
+      }).catch(err => {
+        elGStat.innerHTML = 'Capteurs indisponibles ('+err.name+').'
+          + (FRAMED ? PAGES_LINK : ' Réessaie directement dans Safari, ou joue en tactile.');
+      });
+    }else if('DeviceOrientationEvent' in window || 'ondeviceorientation' in window){
+      window.addEventListener('deviceorientation', onOrient, true);
+      waitForGyro();
+    }else{
+      elGStat.textContent = 'Aucun gyroscope détecté sur cet appareil.';
+    }
+  }catch(err){
+    elGStat.textContent = 'Erreur capteurs : '+err.name;
+  }
+});
+$('bTouch').addEventListener('click', () => {
+  Input.mode = 'touch';
+  launch(pendingMode);
+  showSub('Mode tactile : glisse sur l’écran pour viser.', 3000);
+});
+
+$('bPlay').addEventListener('click', () => {
+  AU.ui();
+  begin(store.get('bf_tuto') ? 'surv' : 'tuto');
+});
+$('bTuto').addEventListener('click', () => { AU.ui(); begin('tuto'); });
+$('bAgain').addEventListener('click', () => { AU.ui(); begin('surv'); });
+$('bMenu').addEventListener('click', () => { AU.ui(); showMenu(); });
+$('bTest').addEventListener('click', () => { AU.init(); AU.resume(); AU.testPan(); });
+$('optFlash').addEventListener('change', e => { reducedFlash = e.target.checked; });
+
+elBest.textContent = game.best>0 ? 'Record : '+game.best : '';
+elCtl.textContent = 'Contrôles : gyroscope (activation à l’écran suivant)';
+</script>
