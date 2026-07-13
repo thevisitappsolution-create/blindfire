@@ -162,6 +162,8 @@
   .btn.primary:active{background:rgba(224,54,44,.4);}
   .btn.ghost{border-color:rgba(167,159,146,.18); color:var(--dim); font-size:12px; padding:10px 0;}
   .best{font-size:12px; letter-spacing:.2em; color:var(--dim); text-transform:uppercase; font-variant-numeric:tabular-nums;}
+  #over{background:rgba(3,3,6,.45);} /* laisse voir le sang qui coule derrière */
+  #over h2, #over #oStats{text-shadow:0 1px 10px #000;}
   .foot{
     position:absolute; bottom:calc(14px + env(safe-area-inset-bottom)); left:20px; right:20px;
     font-size:10.5px; color:#454038; line-height:1.6;
@@ -245,7 +247,7 @@
     <div id="mBest" class="best"></div>
     <div id="mCtl"></div>
     <div class="foot">
-      BLINDFIRE v0.6 · prototype solo «&nbsp;Survie&nbsp;»<br>
+      BLINDFIRE v0.7 · prototype solo «&nbsp;Survie&nbsp;»<br>
       Astuce iPhone&nbsp;: Partager&nbsp;→ «&nbsp;Sur l’écran d’accueil&nbsp;» pour jouer en plein écran.
     </div>
   </div>
@@ -624,6 +626,16 @@ const AU = {
     this.playTone(t, 0.4, 'sine', 660, 660, 0.14, this.master);
     this.playTone(t+0.12, 0.5, 'sine', 990, 990, 0.1, this.master);
   },
+  scare(){
+    if(!this.ctx) return;
+    const t = this.ctx.currentTime;
+    // hurlement dissonant du jumpscare
+    [790, 1130, 1490].forEach(f => {
+      this.playTone(t, 0.55, 'sawtooth', f*rand(0.97,1.03), f*0.55, 0.26, this.master);
+    });
+    this.playNoise(t, 0.5, 'highpass', 1200, 2600, 0.5, this.master);
+    this.playTone(t, 0.6, 'square', 66, 30, 0.5, this.master);
+  },
   ui(){ if(this.ctx) this.playTone(this.ctx.currentTime, 0.03, 'square', 660, 500, 0.08, this.master); },
   ping(azDeg){
     if(!this.ctx) return;
@@ -637,9 +649,62 @@ const AU = {
   setTension(v){ if(this.tensionG) this.tensionG.gain.value = v; }
 };
 
+// ---------------- chuchotements parlés (synthèse vocale, style sorcière/zombie) ----------------
+const Whisper = {
+  voice:null,
+  init(){
+    try{
+      if(!('speechSynthesis' in window)) return;
+      const pick = () => {
+        const vs = speechSynthesis.getVoices();
+        this.voice = vs.find(v => v.lang && v.lang.indexOf('fr')===0) || null;
+      };
+      pick();
+      speechSynthesis.onvoiceschanged = pick;
+      // amorce silencieuse dans le geste utilisateur (iOS)
+      const u = new SpeechSynthesisUtterance(' ');
+      u.volume = 0; speechSynthesis.speak(u);
+    }catch(e){}
+  },
+  say(txt, opts){
+    try{
+      if(!('speechSynthesis' in window) || speechSynthesis.speaking) return;
+      opts = opts || {};
+      const u = new SpeechSynthesisUtterance(txt);
+      if(this.voice) u.voice = this.voice;
+      u.lang = 'fr-FR';
+      u.pitch = opts.pitch!=null ? opts.pitch : 0.1 + Math.random()*0.35;
+      u.rate = opts.rate!=null ? opts.rate : 0.6 + Math.random()*0.2;
+      u.volume = opts.vol!=null ? opts.vol : 0.9;
+      speechSynthesis.speak(u);
+    }catch(e){}
+  },
+  stop(){ try{ if('speechSynthesis' in window) speechSynthesis.cancel(); }catch(e){} }
+};
+const WHISPERS_IDLE = ['par ici…','hé ho…','on a faim…','viens…','on te sent…','tout près…'];
+const WHISPERS_AGGRO = ['j’arriiiive…','je te vois…','à moi !'];
+const whisper = {next: 8};
+
+// ---------------- bestiaire ----------------
+// spd : multiplicateur de vitesse ; grF : plage du grognement ; step : type de pas
+const BESTIARY = {
+  walker: {spd:1.0,  grF:[56,76],   lfoF:0.33, step:'walk'},
+  crawler:{spd:1.3,  grF:[88,112],  lfoF:0.55, step:'pat'},
+  hydra:  {spd:0.72, grF:[42,58],   lfoF:0.28, step:'heavy', dual:true},
+  flyer:  {spd:1.12, grF:[120,150], lfoF:0.95, step:'flap'},
+  spider: {spd:1.05, grF:[130,170], lfoF:1.5,  step:'tick'},
+};
+const BEAST_INTRO = {
+  crawler:'Quelque chose rampe au sol… vise bas.',
+  flyer:'Des ailes fendent l’air en zigzag…',
+  spider:'Ça descend du plafond… vise haut.',
+  hydra:'Plusieurs têtes. Détruis-les toutes.',
+};
+
 // voix spatialisée d'un monstre
 class Voice {
-  constructor(){
+  constructor(B){
+    B = B || BESTIARY.walker;
     const c = AU.ctx;
     this.ok = !!c;
     if(!this.ok) return;
@@ -651,27 +716,57 @@ class Voice {
     this.pan.connect(this.echoG); this.echoG.connect(AU.echoIn);
     // grognement / respiration continue
     this.gr = c.createOscillator(); this.gr.type='sawtooth';
-    this.grF0 = rand(56,76); this.gr.frequency.value = this.grF0;
-    const glp = c.createBiquadFilter(); glp.type='lowpass'; glp.frequency.value=240;
+    this.grF0 = rand(B.grF[0], B.grF[1]); this.gr.frequency.value = this.grF0;
+    const glp = c.createBiquadFilter(); glp.type='lowpass'; glp.frequency.value=280;
     this.grG = c.createGain(); this.grG.gain.value = 0.05;
-    this.lfo = c.createOscillator(); this.lfo.type='sine'; this.lfo.frequency.value = rand(0.26,0.4);
+    this.lfo = c.createOscillator(); this.lfo.type='sine'; this.lfo.frequency.value = B.lfoF*rand(0.85,1.15);
     this.lfoG = c.createGain(); this.lfoG.gain.value = 0.035;
     this.lfo.connect(this.lfoG); this.lfoG.connect(this.grG.gain);
     this.gr.connect(glp); glp.connect(this.grG); this.grG.connect(this.in);
     this.gr.start(); this.lfo.start();
+    if(B.dual){ // hydre : deux gorges qui grondent
+      this.gr2 = c.createOscillator(); this.gr2.type='sawtooth';
+      this.gr2.frequency.value = this.grF0*1.48 + 3;
+      const g2 = c.createGain(); g2.gain.value = 0.6;
+      this.gr2.connect(g2); g2.connect(this.grG);
+      this.gr2.start();
+    }
   }
   setPos(az, dist){
     if(!this.ok) return;
     AU.setPos(this.pan, Math.sin(az*D2R)*dist, 1.1, -Math.cos(az*D2R)*dist);
     this.filt.frequency.value = 500 + 5800*Math.pow(clamp(1-dist/26,0,1),1.6);
   }
-  step(running){
+  step(kind, running){
     if(!this.ok) return;
     const t = AU.now();
-    // impact sourd + craquement sec : le pas doit percer le fond sonore
-    AU.playNoise(t, 0.09, 'bandpass', rand(140,300), 90, running?1.5:1.05, this.in, 1.1);
-    AU.playNoise(t, 0.025, 'bandpass', rand(700,1200), 500, running?0.5:0.35, this.in, 1.5);
-    AU.playTone(t, 0.1, 'sine', 88, 42, running?0.55:0.4, this.in);
+    if(kind==='pat'){          // quadrupède : pattes rapides et feutrées
+      AU.playNoise(t, 0.06, 'bandpass', rand(220,380), 150, running?1.1:0.8, this.in, 1.2);
+      AU.playTone(t, 0.06, 'sine', 120, 66, 0.3, this.in);
+    }else if(kind==='tick'){   // araignée : cliquetis aigus
+      AU.playNoise(t, 0.035, 'bandpass', rand(900,1500), 700, running?0.65:0.5, this.in, 2);
+    }else if(kind==='flap'){   // volant : battements d'ailes
+      AU.playNoise(t, 0.14, 'lowpass', 300, 140, running?0.7:0.55, this.in, 0.7);
+      AU.playTone(t, 0.1, 'sine', 62, 40, 0.22, this.in);
+    }else if(kind==='heavy'){  // hydre : pas lourds
+      AU.playNoise(t, 0.11, 'bandpass', rand(90,180), 70, running?1.7:1.3, this.in, 1);
+      AU.playTone(t, 0.12, 'sine', 66, 36, 0.6, this.in);
+    }else{                     // marcheur : impact sourd + craquement sec
+      AU.playNoise(t, 0.09, 'bandpass', rand(140,300), 90, running?1.5:1.05, this.in, 1.1);
+      AU.playNoise(t, 0.025, 'bandpass', rand(700,1200), 500, running?0.5:0.35, this.in, 1.5);
+      AU.playTone(t, 0.1, 'sine', 88, 42, running?0.55:0.4, this.in);
+    }
+  }
+  whisperCue(){
+    if(!this.ok) return;
+    const t = AU.now();
+    AU.playNoise(t, 0.5, 'bandpass', 3200, 1600, 0.5, this.in, 0.7);
+  }
+  tpWhoosh(){
+    if(!this.ok) return;
+    const t = AU.now();
+    AU.playNoise(t, 0.35, 'bandpass', 400, 2400, 0.6, this.in, 0.8);
+    AU.playTone(t, 0.3, 'sine', 300, 900, 0.22, this.in);
   }
   shriek(){
     if(!this.ok) return;
@@ -716,7 +811,7 @@ class Voice {
   dispose(){
     if(!this.ok || this.disposed) return;
     this.disposed = true;
-    try{ this.gr.stop(); this.lfo.stop(); }catch(e){}
+    try{ this.gr.stop(); this.lfo.stop(); if(this.gr2) this.gr2.stop(); }catch(e){}
     try{ this.in.disconnect(); this.pan.disconnect(); this.echoG.disconnect(); }catch(e){}
   }
 }
@@ -725,9 +820,19 @@ class Voice {
 class Monster {
   constructor(opts){
     opts = opts||{};
+    this.type = opts.type || 'walker';
+    const B = BESTIARY[this.type];
     this.az = opts.az!=null ? opts.az : rand(0,360);
     this.dist = opts.dist!=null ? opts.dist : rand(15,22);
-    this.walkSpeed = opts.speed!=null ? opts.speed : Math.min(2.6, 1.05 + game.wave*0.11 + rand(0,0.15));
+    this.spawnDist = this.dist;
+    this.walkSpeed = (opts.speed!=null ? opts.speed
+      : Math.min(2.6, 1.05 + game.wave*0.11 + rand(0,0.15))) * B.spd;
+    this.stepKind = B.step;
+    this.heads = this.type==='hydra' ? [true,true,true] : null;
+    this.fh = 1.7;   // altitude du volant
+    this.sh = 3.0;   // hauteur de l'araignée (descend du plafond)
+    this.zig = this.type==='flyer' || (game.wave>=6 && this.type==='walker' && Math.random()<0.4);
+    this.tp = !!opts.tp; this.tpT = rand(4,7); this.tpWarnT = 0;
     this.frozen = !!opts.frozen;
     this.slow = 1; this.state = 'walk'; this.stateT = rand(1.5,3.5);
     this.staggerT = 0; this.revealT = 0; this.windupT = 0;
@@ -736,7 +841,7 @@ class Monster {
     this.phase = Math.random(); this.seed = Math.random();
     this.drift = rand(-4,4);
     this.speedNow = 0;
-    this.voice = new Voice();
+    this.voice = new Voice(B);
     this.nextStep = AU.now() + Math.random()*0.6;
     this.voice.setPos(this.az, this.dist);
   }
@@ -744,6 +849,8 @@ class Monster {
     if(this.aggro || this.dead || this.frozen) return;
     this.aggro = true;
     this.voice.shriek();
+    if(Math.random()<0.35)
+      Whisper.say(WHISPERS_AGGRO[Math.floor(Math.random()*WHISPERS_AGGRO.length)], {rate:0.8});
     showSeen();
   }
   windup(){
@@ -755,6 +862,9 @@ class Monster {
     if(this.dead){ this.deadT += dt; return; }
     if(this.frozen){ this.voice.setPos(this.az, this.dist); return; }
     this.revealT = Math.max(0, this.revealT - dt);
+    // hauteur des types aériens
+    if(this.type==='flyer') this.fh = 1.7 + Math.sin(T*1.3 + this.seed*8)*0.5;
+    if(this.type==='spider') this.sh = lerp(3.0, 1.6, clamp(1 - this.dist/this.spawnDist, 0, 1));
     if(this.state==='windup'){
       this.windupT -= dt;
       if(this.windupT<=0) devour(this);
@@ -762,6 +872,21 @@ class Monster {
       return;
     }
     if(this.staggerT>0){ this.staggerT -= dt; this.voice.setPos(this.az, this.dist); return; }
+    // téléporteur : il change de couleur, puis la seconde d'après il a bougé
+    if(this.tp){
+      if(this.tpWarnT>0){
+        this.tpWarnT -= dt;
+        if(this.tpWarnT<=0){
+          this.az = wrapDeg(this.az + (Math.random()<0.5?-1:1)*rand(50,130));
+          this.dist = Math.max(3.2, this.dist - rand(0,1.5));
+          this.voice.tpWhoosh();
+          this.tpT = rand(4,7);
+        }
+      }else{
+        this.tpT -= dt;
+        if(this.tpT<=0 && this.dist>2.5) this.tpWarnT = 1.0;
+      }
+    }
     // détection : ta lumière te trahit
     if(!this.aggro){
       const eff = game.effLight;
@@ -770,39 +895,85 @@ class Monster {
         this.enrage();
       }
     }
-    let sp = this.walkSpeed * this.slow * (this.aggro ? 2.05 : (this.alerted ? 1.18 : 1));
-    if(!this.aggro){
+    // pleine lumière = vitesse maximale, même sans aggro
+    const lightMul = 1 + 1.15*Math.pow(clamp((game.effLight-0.25)/0.75, 0, 1), 1.4);
+    let sp = this.walkSpeed * this.slow
+           * Math.max(this.aggro ? 2.05 : 1, lightMul)
+           * (this.alerted && !this.aggro ? 1.18 : 1);
+    const relentless = this.aggro || this.type==='flyer' || this.type==='spider' || lightMul>1.6;
+    if(!relentless){
       this.stateT -= dt;
       if(this.state==='walk' && this.stateT<=0){ this.state='pause'; this.stateT=rand(0.7,2.2); }
       else if(this.state==='pause' && this.stateT<=0){ this.state='walk'; this.stateT=rand(1.5,4); }
       if(this.state==='pause') sp = 0;
       if(this.dist>6) this.az = wrapDeg(this.az + this.drift*dt);
     }
+    // courses en zigzag
+    if(sp>0 && (this.zig || (this.type==='crawler' && this.aggro))){
+      const amp = this.type==='flyer' ? 36 : 26;
+      this.az = wrapDeg(this.az + Math.sin(T*2.3 + this.seed*12)*amp*dt);
+    }
     this.dist -= sp*dt;
     this.speedNow = sp;
     if(sp>0) this.phase += sp*dt/0.85;
     if(sp>0 && AU.ctx && AU.now()>=this.nextStep){
-      this.voice.step(this.aggro);
-      const period = clamp(0.85/Math.max(0.4,sp), 0.24, 1.1);
+      this.voice.step(this.stepKind, this.aggro);
+      let period = clamp(0.85/Math.max(0.4,sp), 0.24, 1.1);
+      if(this.type==='crawler') period *= 0.55;
+      else if(this.type==='spider') period *= 0.45;
+      else if(this.type==='flyer') period = 0.36;
       this.nextStep = AU.now() + period*rand(0.9,1.1);
     }
     if(this.dist<=1.25) this.windup();
     this.voice.setPos(this.az, this.dist);
   }
-  // 'head' | 'body' | null — visée en degrés
+  // 'head' | 'body' | null — visée en degrés (l'index de tête touchée va dans _headIdx)
   hitTest(){
     if(this.dead) return null;
     const d = Math.max(0.4, this.dist);
     const dy = angDiff(this.az, view.yaw);
     const elev = h => Math.atan2(h-EYE, d)/D2R;
-    const headR = Math.max(2.3, Math.atan2(0.34,d)/D2R);
-    if(Math.abs(dy)<=headR && Math.abs(view.pitch - elev(1.56))<=headR) return 'head';
-    const bodyR = Math.max(3, Math.atan2(0.45,d)/D2R);
-    if(Math.abs(dy)<=bodyR && view.pitch>=elev(0.1)-1.5 && view.pitch<=elev(1.42)+1) return 'body';
+    const ang = mtr => Math.atan2(mtr, d)/D2R;
+    let heads;
+    if(this.type==='hydra'){
+      heads = [];
+      const off = [-0.28, 0, 0.28], hy = [1.5, 1.58, 1.5];
+      for(let i=0;i<3;i++) if(this.heads[i]) heads.push({i:i, dx:off[i], h:hy[i], r:0.3});
+    }else if(this.type==='crawler') heads = [{i:0, dx:0, h:0.75, r:0.3}];
+    else if(this.type==='flyer')    heads = [{i:0, dx:0, h:this.fh, r:0.32}];
+    else if(this.type==='spider')   heads = [{i:0, dx:0, h:this.sh, r:0.34}];
+    else heads = [{i:0, dx:0, h:1.56, r:0.34}];
+    for(const hd of heads){
+      const rr = Math.max(2.3, ang(hd.r));
+      if(Math.abs(dy - ang(hd.dx))<=rr && Math.abs(view.pitch - elev(hd.h))<=rr){
+        this._headIdx = hd.i;
+        return 'head';
+      }
+    }
+    if(this.type==='flyer' || this.type==='spider'){
+      const h0 = this.type==='flyer' ? this.fh : this.sh;
+      if(Math.abs(dy)<=Math.max(3.2, ang(0.55)) && Math.abs(view.pitch - elev(h0))<=Math.max(4, ang(0.6))) return 'body';
+      return null;
+    }
+    const top = this.type==='crawler' ? 0.9 : 1.42;
+    const bw = this.type==='crawler' ? 0.55 : 0.45;
+    if(Math.abs(dy)<=Math.max(3, ang(bw)) && view.pitch>=elev(0.1)-1.5 && view.pitch<=elev(top)+1) return 'body';
     return null;
   }
   onHit(zone){
     if(zone==='head'){
+      if(this.type==='hydra' && this.heads){
+        this.heads[this._headIdx||0] = false;
+        if(this.heads.some(a=>a)){
+          // une tête de moins : il enrage et accélère
+          this.staggerT = 0.7; this.revealT = 2;
+          this.walkSpeed *= 1.18;
+          this.voice.hurt();
+          floatAt(this, 'TÊTE DÉTRUITE', '');
+          if(game.state!=='tuto') game.score += 40;
+          return;
+        }
+      }
       this.die();
     }else{
       this.slow = Math.max(0.45, this.slow*0.7);
@@ -855,6 +1026,89 @@ let reducedFlash = false;
 const dust = [];
 for(let i=0;i<44;i++) dust.push({az:rand(0,360), d:rand(0.8,6), h:rand(0.1,2.3), vh:rand(-0.05,0.08), va:rand(-3,3)});
 
+// gouttes de sang sur l'écran (quand on se fait dévorer)
+const blood = [];
+let rdtG = 0.016;
+function splatterBlood(){
+  blood.length = 0;
+  for(let i=0;i<26;i++)
+    blood.push({x:rand(W*0.08,W*0.92), y0:rand(H*0.05,H*0.55), y:0, r:rand(2.5,7), vy:rand(30,90), big:false});
+  for(let i=0;i<6;i++)
+    blood.push({x:rand(W*0.15,W*0.85), y0:rand(H*0.1,H*0.5), y:0, r:rand(12,26), vy:rand(6,18), big:true});
+}
+function drawBlood(){
+  if(!blood.length) return;
+  g.lineCap = 'round';
+  for(const b of blood){
+    b.y = Math.min(b.y + b.vy*rdtG, H);
+    const wob = Math.sin(b.y*0.02 + b.x)*3;
+    if(b.big){
+      g.fillStyle = 'rgba(120,6,12,0.9)';
+      g.beginPath();
+      g.arc(b.x, b.y0, b.r, 0, TAU);
+      g.arc(b.x + b.r*0.6, b.y0 + b.r*0.5, b.r*0.55, 0, TAU);
+      g.arc(b.x - b.r*0.5, b.y0 + b.r*0.4, b.r*0.4, 0, TAU);
+      g.fill();
+    }
+    g.strokeStyle = 'rgba(138,8,14,0.85)';
+    g.lineWidth = b.r*0.7;
+    g.beginPath(); g.moveTo(b.x, b.y0); g.lineTo(b.x + wob, b.y0 + b.y); g.stroke();
+    g.fillStyle = 'rgba(150,10,16,0.9)';
+    g.beginPath(); g.arc(b.x + wob, b.y0 + b.y, b.r*0.85, 0, TAU); g.fill();
+  }
+}
+// visage d'épouvante qui surgit quand on est dévoré
+function drawScareFace(p){
+  const u = Math.min(W,H) * (0.55 + p*1.05);
+  const jx = (Math.random()-0.5)*14, jy = (Math.random()-0.5)*14;
+  const cx = W/2 + jx, cy = H*0.46 + jy;
+  g.save();
+  // crâne pâle
+  g.fillStyle = '#cfc3b2';
+  g.beginPath();
+  g.ellipse(cx, cy, u*0.36, u*0.48, 0, 0, TAU);
+  g.fill();
+  // ombres des joues et du front
+  g.fillStyle = 'rgba(60,48,40,0.45)';
+  g.beginPath(); g.ellipse(cx-u*0.26, cy+u*0.08, u*0.1, u*0.22, 0.3, 0, TAU); g.fill();
+  g.beginPath(); g.ellipse(cx+u*0.26, cy+u*0.08, u*0.1, u*0.22, -0.3, 0, TAU); g.fill();
+  g.beginPath(); g.ellipse(cx, cy-u*0.34, u*0.3, u*0.1, 0, 0, TAU); g.fill();
+  // orbites noires béantes
+  g.fillStyle = '#050505';
+  g.beginPath(); g.ellipse(cx-u*0.15, cy-u*0.12, u*0.11, u*0.15, 0.25, 0, TAU); g.fill();
+  g.beginPath(); g.ellipse(cx+u*0.15, cy-u*0.12, u*0.11, u*0.15, -0.25, 0, TAU); g.fill();
+  // pupilles minuscules qui tremblent
+  g.fillStyle = '#f4ead6';
+  g.beginPath();
+  g.arc(cx-u*0.15+(Math.random()-0.5)*u*0.04, cy-u*0.12+(Math.random()-0.5)*u*0.04, u*0.016, 0, TAU);
+  g.arc(cx+u*0.15+(Math.random()-0.5)*u*0.04, cy-u*0.12+(Math.random()-0.5)*u*0.04, u*0.016, 0, TAU);
+  g.fill();
+  // narines
+  g.fillStyle = '#0a0808';
+  g.beginPath();
+  g.ellipse(cx-u*0.035, cy+u*0.06, u*0.02, u*0.035, 0.3, 0, TAU);
+  g.ellipse(cx+u*0.035, cy+u*0.06, u*0.02, u*0.035, -0.3, 0, TAU);
+  g.fill();
+  // gueule béante et dents
+  g.fillStyle = '#080404';
+  g.beginPath(); g.ellipse(cx, cy+u*0.26, u*0.2, u*0.17, 0, 0, TAU); g.fill();
+  g.fillStyle = '#e6dcc8';
+  for(let i=-3;i<=3;i++){
+    const tx = cx + i*u*0.052;
+    g.beginPath();
+    g.moveTo(tx-u*0.02, cy+u*0.13); g.lineTo(tx+u*0.02, cy+u*0.13); g.lineTo(tx, cy+u*0.2);
+    g.closePath(); g.fill();
+    g.beginPath();
+    g.moveTo(tx-u*0.018, cy+u*0.39); g.lineTo(tx+u*0.018, cy+u*0.39); g.lineTo(tx, cy+u*0.32);
+    g.closePath(); g.fill();
+  }
+  // sang aux commissures
+  g.strokeStyle = 'rgba(140,10,14,0.9)'; g.lineWidth = u*0.014; g.lineCap='round';
+  g.beginPath(); g.moveTo(cx-u*0.18, cy+u*0.3); g.lineTo(cx-u*0.21, cy+u*0.44); g.stroke();
+  g.beginPath(); g.moveTo(cx+u*0.16, cy+u*0.32); g.lineTo(cx+u*0.18, cy+u*0.47); g.stroke();
+  g.restore();
+}
+
 // ---------------- UI helpers ----------------
 function showMsg(txt, dur, blood){
   elMsg.textContent = txt;
@@ -896,8 +1150,12 @@ function resetRun(){
   game.monsters.length = 0;
   game.score = 0; game.kills = 0; game.wave = 0;
   game.queue = 0; game.waveBreakT = 0; game.dyingM = null;
+  game.seenTypes = {};
+  blood.length = 0;
+  Whisper.stop();
   loaded = true; reloadT = 0; flash = 0; recoil = 0; shake = 0; timeScale = 1;
   hb.next = T + 0.6;
+  whisper.next = T + rand(7,12);
   hideTexts();
 }
 function waveCount(n){ return Math.min(9, 1 + Math.floor((n-1)*0.8)); }
@@ -909,6 +1167,32 @@ function spawnAz(){
   const arc = spawnArc(game.wave);
   if(arc>=180) return rand(0,360);
   return wrapDeg(game.homeYaw + rand(-arc,arc));
+}
+// difficulté crescendo : le bestiaire s'enrichit au fil des vagues
+function pickType(){
+  const w = game.wave;
+  const bag = [['walker', 5]];
+  if(w>=2) bag.push(['crawler', Math.min(3.5, 0.8 + w*0.35)]);
+  if(w>=4) bag.push(['flyer',  Math.min(2.6, 0.4 + w*0.28)]);
+  if(w>=5) bag.push(['spider', Math.min(2.2, 0.3 + w*0.24)]);
+  if(w>=6) bag.push(['hydra',  Math.min(2.0, 0.2 + w*0.22)]);
+  let tot = 0; for(const b of bag) tot += b[1];
+  let r = Math.random()*tot;
+  for(const b of bag){ if((r -= b[1])<=0) return b[0]; }
+  return 'walker';
+}
+function spawnTyped(){
+  const ty = pickType();
+  const tp = game.wave>=8 && (ty==='walker'||ty==='hydra'||ty==='crawler')
+          && Math.random() < 0.25 + (game.wave-8)*0.05;
+  game.monsters.push(new Monster({az: spawnAz(), type: ty, tp: tp}));
+  if(BEAST_INTRO[ty] && !game.seenTypes[ty]){
+    game.seenTypes[ty] = 1;
+    showSub(BEAST_INTRO[ty], 2800);
+  }else if(tp && !game.seenTypes.tp){
+    game.seenTypes.tp = 1;
+    showSub('S’il change de couleur : la seconde d’après, il aura bougé.', 3000);
+  }
 }
 
 function startSurvival(){
@@ -938,7 +1222,10 @@ function devour(m){
   const wasTuto = game.state==='tuto';
   game.state = 'dying'; game.dyingM = m; game.dyingT = 0;
   game._backToTuto = wasTuto;
-  AU.bite(); shake = 1.6;
+  Whisper.say('en voilà un bon repas…', {pitch:0.1, rate:0.85});
+  AU.bite(); AU.scare();
+  splatterBlood();
+  shake = 1.6;
 }
 function finishDeath(){
   game.dyingM && game.dyingM.voice.dispose();
@@ -959,6 +1246,7 @@ function gameOver(){
   game.monsters.forEach(m => m.voice.dispose());
   game.state = 'over';
   AU.setTension(0);
+  Whisper.stop();
   const isRec = game.score > game.best;
   if(isRec){ game.best = game.score; store.set('bf_best', game.best); }
   elStats.innerHTML =
@@ -1097,7 +1385,7 @@ function sim(dt){
     game.dyingT += dt;
     const m = game.dyingM;
     if(m) m.dist = Math.max(0.38, m.dist - dt*4.5);
-    if(game.dyingT>1.15) finishDeath();
+    if(game.dyingT>1.55) finishDeath();
     return;
   }
   if(game.state==='tuto') tutoUpdate(dt);
@@ -1114,7 +1402,7 @@ function sim(dt){
     }else{
       const alive = game.monsters.filter(m=>!m.dead).length;
       if(game.queue>0 && alive<maxSimul(game.wave) && T>=game.nextSpawn){
-        game.monsters.push(new Monster({az: spawnAz()}));
+        spawnTyped();
         game.queue--;
         game.nextSpawn = T + rand(3,6.5);
       }
@@ -1146,6 +1434,19 @@ function audioFrame(){
     AU.thump(0.1 + 0.42*danger);
     hb.next = T + lerp(1.3, 0.34, Math.pow(danger,1.25));
     hb.pulse = 1;
+  }
+  // chuchotements des créatures (« par ici… », « on a faim… »)
+  if(active && game.state!=='dying' && T>=whisper.next){
+    const alive = game.monsters.filter(m => !m.dead && !m.frozen);
+    if(alive.length){
+      const m = alive[Math.floor(Math.random()*alive.length)];
+      m.voice.whisperCue();
+      setTimeout(() => {
+        if(game.state==='playing'||game.state==='tuto')
+          Whisper.say(WHISPERS_IDLE[Math.floor(Math.random()*WHISPERS_IDLE.length)]);
+      }, 350);
+    }
+    whisper.next = T + rand(9,17);
   }
   // gouttes d'ambiance (guidées à l'étape 1 du tutoriel)
   if(T>=amb.nextDrip){
@@ -1259,10 +1560,19 @@ function render(light){
     gr.addColorStop(1,'rgba(120,6,8,'+redA.toFixed(3)+')');
     g.fillStyle = gr; g.fillRect(0,0,W,H);
   }
-  if(game.state==='dying' && game.dyingT>0.95){
-    g.fillStyle = 'rgba(0,0,0,'+clamp((game.dyingT-0.95)*6,0,1)+')';
-    g.fillRect(0,0,W,H);
+  if(game.state==='dying'){
+    const t = game.dyingT;
+    // le visage surgit en stroboscope (fixe si « flashs réduits »)
+    if(t>0.1 && t<0.75){
+      const p = (t-0.1)/0.65;
+      if(reducedFlash || Math.floor(T*26)%3!==0) drawScareFace(p);
+    }
+    if(t>1.25){
+      g.fillStyle = 'rgba(0,0,0,'+clamp((t-1.25)*5,0,1)+')';
+      g.fillRect(0,0,W,H);
+    }
   }
+  drawBlood();
 }
 
 function drawMonster(m){
@@ -1270,21 +1580,27 @@ function drawMonster(m){
   const dy = angDiff(m.az, view.yaw);
   if(Math.abs(dy)>62) return;
   const la = lightAt(d, m);
-  // Les yeux luisent dans le noir : visibles dès l'apparition, de plus en plus
-  // brillants à mesure que la créature approche. Clignement rare pour l'angoisse.
+  // Les yeux luisent dans le NOIR : moins tu éclaires, plus tu les vois ;
+  // en pleine lumière ils s'éteignent (c'est la silhouette qui prend le relais).
+  const darkGlow = 0.35 + 0.65*(1 - clamp(game.effLight, 0, 1));
   const eyeFlk = 0.78 + 0.22*Math.sin(T*4.1 + m.seed*9);
   const blink = Math.sin(T*0.9 + m.seed*23) > 0.985 ? 0.06 : 1;
-  let eyeA = clamp((0.2 + 0.8*Math.pow(1 - clamp(d/26,0,1), 1.35))*eyeFlk*blink + la*0.3, 0, 1);
+  let eyeA = clamp((0.25 + 0.75*Math.pow(1 - clamp(d/26,0,1), 1.3))*eyeFlk*blink*darkGlow, 0, 1);
   if(m.state==='windup') eyeA = 1;
-  if(la<0.015 && eyeA<0.03 && m.revealT<=0) return;
+  const tpWarn = m.tpWarnT>0 && (Math.floor(T*14)%2===0);
+  if(la<0.015 && eyeA<0.03 && m.revealT<=0 && !tpWarn) return;
 
   const feet = project(m.az, 0, d);
   const k = feet.f/d;
-  const br = la;
-  const col = 'rgb('+Math.round(14+br*118)+','+Math.round(13+br*104)+','+Math.round(15+br*92)+')';
+  let br = la;
+  if(tpWarn) br = Math.max(br, 0.55);   // le changement de couleur se voit même dans le noir
+  const col = tpWarn
+    ? 'rgb('+Math.round(90+br*80)+','+Math.round(40+br*50)+','+Math.round(150+br*105)+')'
+    : 'rgb('+Math.round(14+br*118)+','+Math.round(13+br*104)+','+Math.round(15+br*92)+')';
 
   const wind = m.state==='windup';
   const dead = m.dead;
+  const lunge = game.state==='dying' && m===game.dyingM;
   const sq = dead ? Math.max(0.12, 1-m.deadT*2.4) : 1;   // effondrement
   const swing = Math.sin(m.phase*TAU) * (m.aggro?0.3:0.16) * (m.speedNow>0?1:0.15);
   const jit = wind ? (Math.random()-0.5)*0.05 : 0;
@@ -1295,81 +1611,133 @@ function drawMonster(m){
   g.lineCap = 'round'; g.lineJoin = 'round';
   g.fillStyle = col; g.strokeStyle = col;
 
-  // jambes
-  g.lineWidth = 0.09;
-  g.beginPath();
-  g.moveTo(-0.09, 0.95); g.quadraticCurveTo(-0.16, 0.5, -0.13 + swing*0.5, 0.02);
-  g.moveTo(0.09, 0.95);  g.quadraticCurveTo(0.16, 0.5, 0.13 - swing*0.5, 0.02);
-  g.stroke();
-  // torse + tête (silhouette)
-  g.beginPath();
-  g.moveTo(-0.17, 0.92);
-  g.quadraticCurveTo(-0.3, 1.25, -0.21, 1.44);
-  g.quadraticCurveTo(-0.12, 1.52, -0.1, 1.47);
-  g.lineTo(0.1, 1.47);
-  g.quadraticCurveTo(0.12, 1.52, 0.21, 1.44);
-  g.quadraticCurveTo(0.3, 1.25, 0.17, 0.92);
-  g.closePath(); g.fill();
-  const headY = 1.56 + Math.sin(m.phase*TAU*2)*0.015;
-  g.beginPath(); g.arc(0, headY, 0.145, 0, TAU); g.fill();
-  if(wind){ // mâchoire ouverte
-    g.beginPath(); g.ellipse(0, headY-0.16, 0.08, 0.11, 0, 0, TAU); g.fill();
-  }
-  // bras
-  g.lineWidth = 0.07;
-  g.beginPath();
-  if(wind || (game.state==='dying' && m===game.dyingM)){
-    g.moveTo(-0.2, 1.42); g.quadraticCurveTo(-0.5, 1.6, -0.62, 1.85);
-    g.moveTo(0.2, 1.42);  g.quadraticCurveTo(0.5, 1.6, 0.62, 1.85);
-  }else if(m.aggro){
-    g.moveTo(-0.2, 1.4); g.quadraticCurveTo(-0.42, 1.15, -0.5, 0.95);
-    g.moveTo(0.2, 1.4);  g.quadraticCurveTo(0.42, 1.15, 0.5, 0.95);
-  }else{
-    g.moveTo(-0.2, 1.4); g.quadraticCurveTo(-0.36, 0.95, -0.33 - swing*0.2, 0.5);
-    g.moveTo(0.2, 1.4);  g.quadraticCurveTo(0.36, 0.95, 0.33 + swing*0.2, 0.5);
-  }
-  g.stroke();
-  // griffes
-  g.lineWidth = 0.035;
-  const clawY = (wind||game.state==='dying'&&m===game.dyingM) ? 1.85 : (m.aggro?0.95:0.5);
-  const clawX = (wind||game.state==='dying'&&m===game.dyingM) ? 0.62 : (m.aggro?0.5:0.33);
-  for(const s of [-1,1]){
+  if(m.type==='crawler'){
+    // bête à 4 pattes, au ras du sol
+    g.lineWidth = 0.07;
     g.beginPath();
-    for(let i=-1;i<=1;i++){
-      g.moveTo(s*clawX, clawY);
-      g.lineTo(s*clawX + i*0.05, clawY - 0.13);
+    g.moveTo(-0.2, 0.45);  g.quadraticCurveTo(-0.3, 0.2, -0.32 + swing*0.4, 0.02);
+    g.moveTo(-0.08, 0.42); g.quadraticCurveTo(-0.14, 0.2, -0.14 - swing*0.4, 0.02);
+    g.moveTo(0.08, 0.42);  g.quadraticCurveTo(0.14, 0.2, 0.14 + swing*0.4, 0.02);
+    g.moveTo(0.2, 0.45);   g.quadraticCurveTo(0.3, 0.2, 0.32 - swing*0.4, 0.02);
+    g.stroke();
+    g.beginPath(); g.ellipse(0, 0.55, 0.34, 0.22, 0, 0, TAU); g.fill();
+    g.beginPath();
+    for(const sx of [-0.18, -0.02, 0.14]){
+      g.moveTo(sx, 0.72); g.lineTo(sx+0.05, 0.9); g.lineTo(sx+0.1, 0.72);
+    }
+    g.fill();
+    g.beginPath(); g.arc(0, 0.75, 0.13, 0, TAU); g.fill();
+    if(wind){ g.beginPath(); g.ellipse(0, 0.62, 0.08, 0.1, 0, 0, TAU); g.fill(); }
+  }else if(m.type==='flyer'){
+    // bête volante en zigzag
+    const h = m.fh;
+    const flap = Math.sin(m.phase*TAU*2.4);
+    g.beginPath(); g.ellipse(0, h, 0.2, 0.24, 0, 0, TAU); g.fill();
+    for(const s of [-1,1]){
+      g.beginPath();
+      g.moveTo(s*0.12, h+0.06);
+      g.quadraticCurveTo(s*0.45, h+0.3+flap*0.28, s*0.66, h+0.1+flap*0.34);
+      g.quadraticCurveTo(s*0.4, h-0.08+flap*0.1, s*0.14, h-0.1);
+      g.closePath(); g.fill();
+    }
+    if(wind){ g.beginPath(); g.ellipse(0, h-0.16, 0.09, 0.11, 0, 0, TAU); g.fill(); }
+  }else if(m.type==='spider'){
+    // 6 pattes, descend du plafond au bout de son fil
+    const h = m.sh;
+    g.strokeStyle = 'rgba(190,180,155,'+Math.min(0.55, la*0.8+0.08).toFixed(3)+')';
+    g.lineWidth = 0.015;
+    g.beginPath(); g.moveTo(0, h+2.6); g.lineTo(0, h+0.2); g.stroke();
+    g.strokeStyle = col;
+    g.lineWidth = 0.05;
+    g.beginPath();
+    for(const s of [-1,1]){
+      for(let i=0;i<3;i++){
+        const sk = Math.sin(m.phase*TAU*3 + i*2 + (s>0?1:0))*0.06;
+        const ly = h + 0.12 - i*0.12;
+        g.moveTo(s*0.12, ly);
+        g.quadraticCurveTo(s*0.42, ly+0.18+sk, s*0.52, ly-0.14+sk);
+      }
+    }
+    g.stroke();
+    g.beginPath(); g.ellipse(0, h+0.08, 0.24, 0.2, 0, 0, TAU); g.fill();
+    g.beginPath(); g.arc(0, h-0.12, 0.13, 0, TAU); g.fill();
+  }else{
+    // marcheur / hydre : silhouette humanoïde (l'hydre est plus massive)
+    const hydra = m.type==='hydra';
+    const wMul = hydra ? 1.35 : 1;
+    g.lineWidth = 0.09;
+    g.beginPath();
+    g.moveTo(-0.09*wMul, 0.95); g.quadraticCurveTo(-0.16, 0.5, -0.13 + swing*0.5, 0.02);
+    g.moveTo(0.09*wMul, 0.95);  g.quadraticCurveTo(0.16, 0.5, 0.13 - swing*0.5, 0.02);
+    g.stroke();
+    g.beginPath();
+    g.moveTo(-0.17*wMul, 0.92);
+    g.quadraticCurveTo(-0.3*wMul, 1.25, -0.21*wMul, 1.44);
+    g.lineTo(0.21*wMul, 1.44);
+    g.quadraticCurveTo(0.3*wMul, 1.25, 0.17*wMul, 0.92);
+    g.closePath(); g.fill();
+    if(hydra){
+      const off = [-0.28, 0, 0.28], hy = [1.5, 1.58, 1.5];
+      g.lineWidth = 0.06;
+      for(let i=0;i<3;i++){
+        if(m.heads[i]){
+          g.beginPath(); g.moveTo(off[i]*0.4, 1.42); g.lineTo(off[i], hy[i]-0.1); g.stroke();
+          g.beginPath(); g.arc(off[i], hy[i], 0.125, 0, TAU); g.fill();
+        }else{
+          g.beginPath(); g.moveTo(off[i]*0.4, 1.42); g.lineTo(off[i]*0.8, 1.46); g.stroke();
+        }
+      }
+    }else{
+      const headY = 1.56 + Math.sin(m.phase*TAU*2)*0.015;
+      g.beginPath(); g.arc(0, headY, 0.145, 0, TAU); g.fill();
+      if(wind){ g.beginPath(); g.ellipse(0, headY-0.16, 0.08, 0.11, 0, 0, TAU); g.fill(); }
+    }
+    // bras
+    g.lineWidth = 0.07;
+    g.beginPath();
+    if(wind || lunge){
+      g.moveTo(-0.2*wMul, 1.42); g.quadraticCurveTo(-0.5, 1.6, -0.62, 1.85);
+      g.moveTo(0.2*wMul, 1.42);  g.quadraticCurveTo(0.5, 1.6, 0.62, 1.85);
+    }else if(m.aggro){
+      g.moveTo(-0.2*wMul, 1.4); g.quadraticCurveTo(-0.42, 1.15, -0.5, 0.95);
+      g.moveTo(0.2*wMul, 1.4);  g.quadraticCurveTo(0.42, 1.15, 0.5, 0.95);
+    }else{
+      g.moveTo(-0.2*wMul, 1.4); g.quadraticCurveTo(-0.36, 0.95, -0.33 - swing*0.2, 0.5);
+      g.moveTo(0.2*wMul, 1.4);  g.quadraticCurveTo(0.36, 0.95, 0.33 + swing*0.2, 0.5);
     }
     g.stroke();
   }
   // contour "révélé" (touché au corps)
   if(m.revealT>0 && !dead){
     g.strokeStyle = 'rgba(224,54,44,'+(0.5*Math.min(1,m.revealT)).toFixed(3)+')';
-    g.lineWidth = 0.022;
-    g.beginPath(); g.arc(0, headY, 0.165, 0, TAU); g.stroke();
+    g.lineWidth = 0.03;
+    const rh = m.type==='crawler' ? 0.55 : m.type==='flyer' ? m.fh : m.type==='spider' ? m.sh : 1.2;
     g.beginPath();
-    g.moveTo(-0.19, 0.92); g.quadraticCurveTo(-0.32, 1.25, -0.23, 1.46);
-    g.moveTo(0.19, 0.92);  g.quadraticCurveTo(0.32, 1.25, 0.23, 1.46);
+    g.ellipse(0, rh, 0.42, m.type==='crawler' ? 0.3 : 0.55, 0, 0, TAU);
     g.stroke();
   }
   g.restore();
 
-  // yeux (repère glaçant dans le noir : halo + point brillant)
+  // yeux luisants (positions selon le type de créature)
   if(eyeA>0.02 && !dead){
-    const exOff = Math.max(1.6, 0.052*k), eyY = feet.y - 1.58*k*sq;
-    const r = Math.max(1.3, 0.021*k);
-    const ec = wind ? '255,70,50' : '255,233,184';
-    g.fillStyle = 'rgba('+ec+','+(eyeA*0.22).toFixed(3)+')';
-    g.beginPath();
-    g.arc(feet.x-exOff, eyY, r*3.2, 0, TAU);
-    g.moveTo(feet.x+exOff+r*3.2, eyY);
-    g.arc(feet.x+exOff, eyY, r*3.2, 0, TAU);
-    g.fill();
-    g.fillStyle = 'rgba('+ec+','+Math.min(1,eyeA*0.95).toFixed(3)+')';
-    g.beginPath();
-    g.arc(feet.x-exOff, eyY, r, 0, TAU);
-    g.moveTo(feet.x+exOff+r, eyY);
-    g.arc(feet.x+exOff, eyY, r, 0, TAU);
-    g.fill();
+    let eyes;
+    if(m.type==='hydra'){
+      eyes = [];
+      const off = [-0.28, 0, 0.28], hy = [1.52, 1.6, 1.52];
+      for(let i=0;i<3;i++) if(m.heads[i]) eyes.push({x:off[i]-0.04,h:hy[i]},{x:off[i]+0.04,h:hy[i]});
+    }else if(m.type==='crawler') eyes=[{x:-0.045,h:0.76},{x:0.045,h:0.76}];
+    else if(m.type==='flyer') eyes=[{x:-0.06,h:m.fh+0.03},{x:0.06,h:m.fh+0.03}];
+    else if(m.type==='spider') eyes=[{x:-0.09,h:m.sh-0.14},{x:-0.03,h:m.sh-0.09},{x:0.03,h:m.sh-0.09},{x:0.09,h:m.sh-0.14}];
+    else eyes=[{x:-0.052,h:1.58},{x:0.052,h:1.58}];
+    const r = Math.max(1.3, 0.021*k*(m.type==='spider' ? 0.7 : 1));
+    const ec = tpWarn ? '190,120,255' : wind ? '255,70,50' : '255,233,184';
+    for(const e of eyes){
+      const ex = feet.x + e.x*k, ey = feet.y - e.h*k*sq;
+      g.fillStyle = 'rgba('+ec+','+(eyeA*0.22).toFixed(3)+')';
+      g.beginPath(); g.arc(ex, ey, r*3.2, 0, TAU); g.fill();
+      g.fillStyle = 'rgba('+ec+','+Math.min(1,eyeA*0.95).toFixed(3)+')';
+      g.beginPath(); g.arc(ex, ey, r, 0, TAU); g.fill();
+    }
   }
 }
 
@@ -1452,6 +1820,7 @@ function frame(ts){
   if(!lastTs) lastTs = ts;
   const rdt = Math.min(0.05, (ts-lastTs)/1000);
   lastTs = ts;
+  rdtG = rdt;
   T += rdt;
   timeScale += (1-timeScale)*Math.min(1, rdt*5);
   const dt = rdt*timeScale;
@@ -1508,6 +1877,7 @@ const PAGES_LINK = '<br><a href="'+PAGES_URL+'">&#10132; Ouvrir la version «&nb
 
 function begin(mode){
   AU.init(); AU.resume();
+  Whisper.init();
   wakeLock();
   if(Input.gyroActive){ launch(mode); return; }
   pendingMode = mode;

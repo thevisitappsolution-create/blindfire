@@ -52,6 +52,17 @@ Espace ou clic sur le bouton pour tirer.
   que le casque n'est pas inversé avant de jouer.
 - **Joystick virtuel 8 directions** en mode tactile (gauche/droite/haut/bas +
   diagonales, branche active illuminée), en plus du glisser-viser.
+- **Bestiaire crescendo** : marcheurs, quadrupèdes au sol (vague 2+), volants en
+  zigzag (4+), araignées à 6 pattes qui descendent du plafond (5+), hydres à
+  3 têtes — chaque tête doit être détruite (6+), téléporteurs (8+ : il change de
+  couleur, la seconde d'après il a bougé).
+- **Lumière = vitesse** : à luminosité maximale, toutes les créatures foncent à
+  leur vitesse max. Et leurs yeux brillent d'autant plus qu'il fait sombre
+  (l'inverse en pleine lumière).
+- **Épouvante** : gouttes de sang sur l'écran et visage horrifique en jumpscare
+  quand on est dévoré ; chuchotements parlés en français (« par ici… »,
+  « on a faim… », « j'arriiiive… ») via la synthèse vocale du téléphone, ralentie
+  et rendue gutturale.
 - **Munition unique + rechargement** (1,4 s) — le tir raté coûte cher.
 - **Mode Survie** : vagues croissantes, score, record local.
 - **Tutoriel progressif** conforme au PRD : Écoute → Lumière → Tir → Survie.
