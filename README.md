@@ -72,6 +72,19 @@ Espace ou clic sur le bouton pour tirer.
 - **Reprise de partie** : après 10 minutes de jeu cumulées, un bouton « Reprendre —
   vague N » apparaît au menu et restaure la vague, le score et les vies
   sauvegardés à chaque début de vague (localStorage).
+- **Fin de partie : LA HORDE (vague 20)** : vingt zombies épaule contre épaule en
+  marche inexorable ; les abattre tous = victoire (+500 pts, +2000 pièces).
+- **Économie (bêta, 100 % virtuelle)** : boutique d'armes 2/3/4/5 coups
+  (200/400/600/1000 pièces — plus de coups = rechargement plus long), bonus de
+  vies 24 h / 7 j, coffre toutes les 10 min de jeu (50-150 pièces, barre de
+  progression en bas de l'écran), parrainage par partage (paliers 10/20/30/50
+  amis). Aucun paiement réel pour l'instant ; grille indicative 100 pièces ≃ 1 €.
+- **Profil & stats** : pseudo, avatar, précision, réflexe moyen, victoires,
+  meilleurs scores locaux — le classement mondial en ligne nécessitera un
+  backend (Firebase/Supabase) à la sortie.
+- **Mentions légales intégrées** (écran dédié) : avertissements horreur/
+  photosensibilité/volume, RGPD (données 100 % locales, bouton d'effacement),
+  monnaie virtuelle — modèle à faire valider juridiquement avant commercialisation.
 - **Lumière = vitesse** : à luminosité maximale, toutes les créatures foncent à
   leur vitesse max. Et leurs yeux brillent d'autant plus qu'il fait sombre
   (l'inverse en pleine lumière).

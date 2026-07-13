@@ -183,10 +183,81 @@
   .btnrow .btn{width:auto; flex:1; letter-spacing:.12em; text-indent:.12em; font-size:13px;}
   .btn[disabled]{opacity:.35; pointer-events:none;}
   #atStat{font-size:13px; color:var(--lamp); min-height:44px; max-width:300px; line-height:1.5;}
-  #oStats{font-size:14px; line-height:2; color:var(--bone); font-variant-numeric:tabular-nums; margin-bottom:8px;}
-  #oStats em{color:var(--lamp); font-style:normal;}
-  #oStats .rec{color:var(--blood); letter-spacing:.2em; text-transform:uppercase; font-size:12px;}
+  #oStats, #wStats{font-size:14px; line-height:2; color:var(--bone); font-variant-numeric:tabular-nums; margin-bottom:8px;}
+  #oStats em, #wStats em{color:var(--lamp); font-style:normal;}
+  .rec{color:var(--blood); letter-spacing:.2em; text-transform:uppercase; font-size:12px;}
   label.opt{display:flex; align-items:center; gap:8px; font-size:12px; color:var(--dim); cursor:pointer;}
+
+  /* ---------- Boutique / Profil / Légal ---------- */
+  .screen.scroll{justify-content:flex-start; overflow-y:auto; padding-top:34px; padding-bottom:40px; -webkit-overflow-scrolling:touch;}
+  .screen h2.small{font-size:24px; margin-top:6px;}
+  .subT{
+    font-family:Futura,"Avenir Next Condensed",sans-serif; font-weight:500;
+    font-size:13px; letter-spacing:.3em; text-indent:.3em; text-transform:uppercase;
+    color:var(--dim); margin:14px 0 2px;
+  }
+  .coins{font-size:15px; color:var(--lamp); letter-spacing:.08em; font-variant-numeric:tabular-nums;}
+  .shopList{display:flex; flex-direction:column; gap:8px; width:min(360px,90vw);}
+  .item{
+    display:flex; justify-content:space-between; align-items:center; gap:10px;
+    border:1px solid rgba(167,159,146,.22); border-radius:6px; padding:10px 12px;
+    text-align:left;
+  }
+  .item .nm{font-size:13px; color:var(--bone); line-height:1.4;}
+  .item .nm small{display:block; color:var(--dim); font-size:11px;}
+  .item .buy{
+    font-family:Futura,"Avenir Next Condensed",sans-serif; white-space:nowrap;
+    font-size:12px; letter-spacing:.1em; text-transform:uppercase; cursor:pointer;
+    color:var(--bone); background:none; border:1px solid rgba(167,159,146,.4);
+    padding:8px 12px; border-radius:4px; -webkit-tap-highlight-color:transparent;
+  }
+  .item .buy.can{border-color:var(--blood); color:#fff; background:rgba(224,54,44,.16);}
+  .item .buy.eq{border-color:var(--lamp); color:var(--lamp);}
+  .item .buy[disabled]{opacity:.4; pointer-events:none;}
+  .notice{font-size:11px; color:var(--dim); max-width:min(360px,90vw); line-height:1.5;}
+  .statsBox{
+    width:min(360px,90vw); border:1px solid rgba(167,159,146,.18); border-radius:6px;
+    padding:10px 14px; font-size:13px; line-height:1.9; text-align:left;
+    color:var(--bone); font-variant-numeric:tabular-nums;
+  }
+  .statsBox em{color:var(--lamp); font-style:normal;}
+  .avRow{display:flex; flex-wrap:wrap; gap:8px; justify-content:center; max-width:min(360px,90vw);}
+  .avBtn{
+    width:46px; height:46px; font-size:24px; border-radius:8px; cursor:pointer;
+    border:1px solid rgba(167,159,146,.25); background:rgba(167,159,146,.06);
+    -webkit-tap-highlight-color:transparent;
+  }
+  .avBtn.sel{border-color:var(--blood); background:rgba(224,54,44,.15);}
+  #pName{
+    background:rgba(167,159,146,.07); border:1px solid rgba(167,159,146,.3);
+    border-radius:4px; color:var(--bone); font-size:15px; padding:10px 12px;
+    width:min(260px,80vw); text-align:center; letter-spacing:.06em;
+  }
+  #pName:focus{outline:2px solid var(--lamp); outline-offset:1px;}
+  input{-webkit-user-select:text; user-select:text;}
+  .legalTxt{
+    max-width:min(560px,92vw); text-align:left; font-size:12.5px; line-height:1.65;
+    color:var(--bone);
+  }
+  .legalTxt h4{
+    font-family:Futura,"Avenir Next Condensed",sans-serif; font-weight:500;
+    letter-spacing:.18em; text-transform:uppercase; color:var(--lamp);
+    margin:16px 0 4px; font-size:13px;
+  }
+  .legalTxt p{margin:4px 0;}
+  .foot a{color:#6e6759; text-decoration:underline; cursor:pointer;}
+  /* barre du coffre (10 min de jeu = récompense) */
+  #chest{position:absolute; left:0; right:0; bottom:0; height:4px; background:rgba(201,185,138,.1);}
+  #chestFill{height:100%; width:0%; background:linear-gradient(90deg,#8a6d2b,#e6c15a);}
+  /* toast */
+  #toast{
+    position:absolute; left:50%; bottom:130px; transform:translateX(-50%);
+    background:rgba(8,8,13,.95); border:1px solid rgba(230,193,90,.5);
+    color:var(--lamp); font-size:13px; padding:10px 18px; border-radius:6px;
+    opacity:0; pointer-events:none; transition:opacity .3s; z-index:40;
+    max-width:86vw; text-align:center;
+  }
+  #toast.show{opacity:1;}
 
   /* ---------- Floaters ---------- */
   .float{
@@ -224,7 +295,9 @@
     <div id="msg"></div>
     <div id="sub"></div>
     <div id="prog" class="hidden"><div id="progFill"></div></div>
+    <div id="chest"><div id="chestFill"></div></div>
   </div>
+  <div id="toast"></div>
 
   <button id="fire" class="hidden" aria-label="Tirer">
     <span id="fireRing"></span><span id="fireDot"></span>
@@ -250,13 +323,19 @@
     <button id="bPlay" class="btn primary">Jouer</button>
     <button id="bResume" class="btn hidden">Reprendre</button>
     <button id="bTuto" class="btn">Tutoriel</button>
+    <div class="btnrow">
+      <button id="bShop" class="btn">Boutique</button>
+      <button id="bProfil" class="btn">Profil</button>
+    </div>
     <button id="bTest" class="btn ghost">Test audio (casque)</button>
     <label class="opt"><input type="checkbox" id="optFlash"> Flashs réduits (photosensibilité)</label>
+    <div id="mCoins" class="coins"></div>
     <div id="mBest" class="best"></div>
     <div id="mCtl"></div>
     <div class="foot">
-      BLINDFIRE v0.13 · prototype solo «&nbsp;Survie&nbsp;»<br>
-      Astuce iPhone&nbsp;: Partager&nbsp;→ «&nbsp;Sur l’écran d’accueil&nbsp;» pour jouer en plein écran.
+      BLINDFIRE v0.14 bêta · déconseillé aux moins de 16 ans<br>
+      Astuce iPhone&nbsp;: Partager&nbsp;→ «&nbsp;Sur l’écran d’accueil&nbsp;» pour le plein écran.
+      · <a id="footLegal">Mentions légales &amp; confidentialité</a>
     </div>
   </div>
 
@@ -279,6 +358,91 @@
     <button id="bGyro" class="btn primary">Activer le gyroscope</button>
     <div id="gStat"></div>
     <button id="bTouch" class="btn ghost">Jouer en mode tactile (au doigt)</button>
+  </div>
+
+  <div id="win" class="screen hidden">
+    <h2>VICTOIRE</h2>
+    <div id="wStats"></div>
+    <button id="wAgain" class="btn primary">Rejouer</button>
+    <button id="wMenu" class="btn">Menu</button>
+  </div>
+
+  <div id="shop" class="screen scroll hidden">
+    <h2 class="small">BOUTIQUE</h2>
+    <div id="shopCoins" class="coins"></div>
+    <div class="subT">Armes</div>
+    <div id="shopArmes" class="shopList"></div>
+    <div class="subT">Bonus temporaires</div>
+    <div id="shopBoosts" class="shopList"></div>
+    <p class="notice">
+      Bêta&nbsp;: monnaie 100&nbsp;% virtuelle, gagnée en jouant (coffre toutes les
+      10&nbsp;minutes, parrainage, victoire). Aucun achat en argent réel pour l’instant
+      — à la sortie&nbsp;: 100&nbsp;pièces&nbsp;≃&nbsp;1&nbsp;€.
+    </p>
+    <button id="shopBack" class="btn ghost">Retour au menu</button>
+  </div>
+
+  <div id="profil" class="screen scroll hidden">
+    <h2 class="small">PROFIL</h2>
+    <div id="avRow" class="avRow"></div>
+    <input id="pName" maxlength="14" placeholder="Ton pseudo" autocomplete="off">
+    <div class="subT">Tes statistiques</div>
+    <div id="statsBox" class="statsBox"></div>
+    <div class="subT">Meilleurs scores (sur cet appareil)</div>
+    <div id="lbBox" class="statsBox"></div>
+    <p class="notice">Classement mondial en ligne&nbsp;: à la sortie officielle (nécessite un serveur).</p>
+    <div class="subT">Inviter des amis</div>
+    <div id="refBox" class="statsBox"></div>
+    <button id="bShare" class="btn primary">Partager le jeu</button>
+    <button id="profilBack" class="btn ghost">Retour au menu</button>
+  </div>
+
+  <div id="legal" class="screen scroll hidden">
+    <h2 class="small">MENTIONS LÉGALES</h2>
+    <div class="legalTxt">
+      <h4>Éditeur</h4>
+      <p>BLINDFIRE (version bêta) — édité par&nbsp;: <b>[ton nom / ta société]</b>.
+      Contact&nbsp;: the.visit.app.solution@gmail.com. Hébergement&nbsp;: GitHub Pages
+      (GitHub, Inc., 88 Colin P. Kelly Jr. St, San Francisco, CA 94107, États-Unis).</p>
+      <h4>Avertissements — jeu d’horreur</h4>
+      <p>Jeu d’épouvante comportant obscurité, apparitions soudaines (jumpscares),
+      cris, sang stylisé et créatures effrayantes. <b>Déconseillé aux moins de
+      16&nbsp;ans</b> et aux personnes sensibles. Certains effets lumineux rapides
+      peuvent affecter les personnes photosensibles ou épileptiques&nbsp;: utilisez
+      l’option «&nbsp;Flashs réduits&nbsp;» du menu et cessez de jouer en cas de malaise.
+      Jeu conçu pour être joué au casque&nbsp;: réglez le volume à un niveau modéré
+      avant de lancer une partie — certains sons sont soudains et forts.</p>
+      <h4>Données personnelles (RGPD)</h4>
+      <p>Cette version bêta ne collecte, ne transmet et ne partage <b>aucune donnée
+      personnelle</b>. Toutes les données de jeu — pseudo, avatar, scores, pièces
+      virtuelles, statistiques, temps de jeu, sauvegarde de progression — sont
+      stockées <b>uniquement sur votre appareil</b> (stockage local du navigateur).
+      Aucun cookie de suivi, aucune publicité, aucun traceur, aucun compte en ligne.
+      Le pseudo choisi n’est visible que par vous. Lors de l’arrivée du classement
+      mondial en ligne, l’envoi du pseudo, de l’avatar et du score fera l’objet d’un
+      consentement explicite préalable et d’une mise à jour de cette politique.</p>
+      <p>Conformément au RGPD (art. 15 à 17), vous pouvez consulter ou effacer vos
+      données à tout moment&nbsp;: elles sont locales, et le bouton ci-dessous les
+      supprime définitivement. Responsable de traitement et contact&nbsp;:
+      the.visit.app.solution@gmail.com.</p>
+      <h4>Monnaie virtuelle</h4>
+      <p>Les «&nbsp;pièces&nbsp;» sont une monnaie strictement virtuelle, sans valeur
+      monétaire réelle, non cessible et non remboursable, obtenue uniquement en
+      jouant pendant la bêta. Aucun achat en argent réel n’est proposé dans cette
+      version. Les équivalences affichées (100&nbsp;pièces&nbsp;≃&nbsp;1&nbsp;€) sont
+      indicatives et concernent une future version distribuée via l’App&nbsp;Store,
+      qui appliquera alors les conditions d’Apple (achats intégrés, droit de
+      rétractation, contrôle parental).</p>
+      <h4>Propriété intellectuelle</h4>
+      <p>Le jeu, son code, ses visuels et ses sons sont protégés. Toute reproduction
+      non autorisée est interdite. © 2026 BLINDFIRE — tous droits réservés.</p>
+      <p><i>Modèle de mentions à faire valider par un professionnel du droit avant
+      toute exploitation commerciale (notamment pour l’App&nbsp;Store&nbsp;: politique
+      de confidentialité accessible par URL publique, «&nbsp;nutrition labels&nbsp;»
+      App&nbsp;Privacy, et classification d’âge).</i></p>
+    </div>
+    <button id="bWipe" class="btn ghost">Effacer toutes mes données</button>
+    <button id="legalBack" class="btn ghost">Retour au menu</button>
   </div>
 
   <div id="pause" class="screen hidden">
@@ -668,13 +832,14 @@ const AU = {
     this.playTone(t, 0.02, 'square', 1500, 1100, 0.12, this.master);
     this.playNoise(t, 0.03, 'highpass', 2500, 2500, 0.1, this.master);
   },
-  reloadSfx(){
+  reloadSfx(dur){
     if(!this.ctx) return;
+    dur = dur || 1.4;
     const t = this.ctx.currentTime;
-    this.playNoise(t+0.5, 0.03, 'highpass', 1800, 1800, 0.3, this.master);
-    this.playTone(t+0.5, 0.02, 'square', 900, 700, 0.12, this.master);
-    this.playNoise(t+0.92, 0.04, 'bandpass', 700, 500, 0.32, this.master);
-    this.playNoise(t+1.24, 0.11, 'bandpass', 420, 900, 0.3, this.master);
+    this.playNoise(t+dur*0.36, 0.03, 'highpass', 1800, 1800, 0.3, this.master);
+    this.playTone(t+dur*0.36, 0.02, 'square', 900, 700, 0.12, this.master);
+    this.playNoise(t+dur*0.66, 0.04, 'bandpass', 700, 500, 0.32, this.master);
+    this.playNoise(t+dur*0.89, 0.11, 'bandpass', 420, 900, 0.3, this.master);
   },
   boom(){
     if(!this.ctx) return;
@@ -881,6 +1046,8 @@ class Monster {
     this.phase = Math.random(); this.seed = Math.random();
     this.drift = rand(-4,4);
     this.speedNow = 0;
+    this.horde = false;
+    this.bornT = T;
     this.voice = new Voice(B);
     this.nextStep = AU.now() + Math.random()*0.6;
     this.voice.setPos(this.az, this.dist);
@@ -938,6 +1105,7 @@ class Monster {
     let sp = this.walkSpeed * this.slow
            * Math.max(this.aggro ? 2.05 : 1, lightMul)
            * (this.alerted && !this.aggro ? 1.18 : 1);
+    if(this.horde) sp = this.walkSpeed * this.slow;   // la Horde marche, inexorable
     const relentless = this.aggro || this.type==='flyer' || this.type==='spider' || lightMul>1.6;
     if(!relentless){
       this.stateT -= dt;
@@ -1033,6 +1201,8 @@ class Monster {
       tutoKill();
     }else{
       game.kills++;
+      game.reflexSum += Math.max(0, T - this.bornT);
+      game.reflexN++;
       const pts = 100 + 10*game.wave;
       game.score += pts;
       floatAt(this, '+'+pts, '');
@@ -1047,7 +1217,85 @@ const game = {
   best:+(store.get('bf_best')||0),
   monsters:[], queue:0, nextSpawn:0, waveBreakT:0, cleared:false,
   effLight:0, dyingM:null, dyingT:0, aimZone:null, homeYaw:0, lives:3,
+  maxLives:3, weapon:null, shots:0, hits:0, reflexSum:0, reflexN:0,
 };
+
+// ---------------- économie : pièces, armes, bonus ----------------
+function jget(k, d){ try{ const v = JSON.parse(store.get(k)); return v==null ? d : v; }catch(e){ return d; } }
+function jset(k, v){ store.set(k, JSON.stringify(v)); }
+function coins(){ return +(store.get('bf_coins')||0); }
+function addCoins(n){
+  store.set('bf_coins', Math.max(0, coins()+n));
+  refreshCoinsUI();
+}
+const WEAPONS = {
+  1:{nm:'Pistolet', shots:1, reload:1.4, price:0},
+  2:{nm:'Double',   shots:2, reload:1.9, price:200},
+  3:{nm:'Triple',   shots:3, reload:2.4, price:400},
+  4:{nm:'Quadruple',shots:4, reload:2.9, price:600},
+  5:{nm:'Quintuple',shots:5, reload:3.4, price:1000},
+};
+const BOOSTS = [
+  {id:'v1',  nm:'+1 vie',            det:'pendant 24 h',   price:500,  lives:1, weapon:null, dur:86400e3},
+  {id:'v2',  nm:'+2 vies',           det:'pendant 24 h',   price:1000, lives:2, weapon:null, dur:86400e3},
+  {id:'p24', nm:'5 coups + 5 vies',  det:'pendant 24 h',   price:2500, lives:5, weapon:5,    dur:86400e3},
+  {id:'p7j', nm:'5 coups + 5 vies',  det:'pendant 7 jours',price:5000, lives:5, weapon:5,    dur:7*86400e3},
+];
+function boostState(){
+  const b = jget('bf_boost', null);
+  return (b && Date.now() < b.until) ? b : {lives:0, weapon:null, until:0};
+}
+function maxLivesNow(){ return 3 + (boostState().lives||0); }
+function equippedWeapon(){
+  const b = boostState();
+  if(b.weapon && WEAPONS[b.weapon]) return WEAPONS[b.weapon];
+  return WEAPONS[+(store.get('bf_weapon')||1)] || WEAPONS[1];
+}
+function getProfile(){ return jget('bf_profile', {name:'Chasseur', avatar:'🌑'}); }
+
+// coffre : 10 minutes de jeu = 50, 100 ou 150 pièces
+let chestProg = +(store.get('bf_chest')||0);
+function chestTick(rdt){
+  chestProg += rdt;
+  if(chestProg >= 600){
+    chestProg -= 600;
+    const won = [50,100,150][Math.floor(Math.random()*3)];
+    addCoins(won);
+    toast('🪙 Coffre ouvert : +'+won+' pièces !');
+    AU.chime();
+  }
+}
+
+// fin de partie : statistiques cumulées + meilleurs scores locaux
+function endRunStats(win){
+  const st = jget('bf_stats', {shots:0,hits:0,kills:0,best:0,games:0,wins:0});
+  st.shots += game.shots; st.hits += game.hits; st.kills += game.kills;
+  st.best = Math.max(st.best, game.wave); st.games++; if(win) st.wins++;
+  jset('bf_stats', st);
+  const p = getProfile();
+  const list = jget('bf_scores', []);
+  list.push({n:p.name, a:p.avatar, s:game.score, w:game.wave, t:Date.now()});
+  list.sort((x,y)=>y.s-x.s);
+  if(list.length>10) list.length = 10;
+  jset('bf_scores', list);
+}
+function runPrec(){ return game.shots ? Math.round(100*game.hits/game.shots) : 0; }
+function runRefl(){
+  return game.reflexN ? (game.reflexSum/game.reflexN).toFixed(1).replace('.',',')+' s' : '—';
+}
+
+let toastTimer = null;
+function toast(txt){
+  const t = $('toast');
+  t.textContent = txt;
+  t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(()=>t.classList.remove('show'), 2800);
+}
+function refreshCoinsUI(){
+  $('mCoins').textContent = '🪙 '+coins()+' pièces';
+  $('shopCoins').textContent = '🪙 '+coins()+' pièces';
+}
 const tuto = {step:0, t:0, prog:0, az:0};
 const view = {yaw:0, pitch:-34};
 const hb = {next:0, pulse:0};
@@ -1055,7 +1303,7 @@ const amb = {nextDrip:2};
 const dyCam = {vy:0, vp:0, next:0, offY:0, offP:0};   // caméra chaotique de dévoration
 
 let T = 0, lastTs = 0, timeScale = 1;
-let loaded = true, reloadT = 0;
+let mag = 1, reloadT = 0;
 let flash = 0, recoil = 0, shake = 0;
 let danger = 0;
 let msgTimer = null, subTimer = null, seenT = 0;
@@ -1239,9 +1487,12 @@ function resetRun(){
   game.score = 0; game.kills = 0; game.wave = 0;
   game.queue = 0; game.waveBreakT = 0; game.dyingM = null;
   game.seenTypes = {};
-  game.lives = 3;
+  game.maxLives = maxLivesNow();
+  game.lives = game.maxLives;
+  game.weapon = equippedWeapon();
+  game.shots = 0; game.hits = 0; game.reflexSum = 0; game.reflexN = 0;
   blood.length = 0;
-  loaded = true; reloadT = 0; flash = 0; recoil = 0; shake = 0; timeScale = 1;
+  mag = game.weapon.shots; reloadT = 0; flash = 0; recoil = 0; shake = 0; timeScale = 1;
   hb.next = T + 0.6;
   whisper.next = T + rand(7,12);
   hideTexts();
@@ -1316,21 +1567,63 @@ function startSurvival(cp){
   beginWave(cp ? cp.wave : 1);
 }
 function beginWave(n){
-  game.wave = n; game.queue = waveCount(n); game.cleared = false;
-  game.nextSpawn = T + 1.6;
+  game.wave = n; game.cleared = false;
   saveRun();
+  if(n>=20){
+    // LA HORDE : vingt zombies épaule contre épaule, marche inexorable
+    game.queue = 0;
+    showMsg('LA HORDE', 3000, true);
+    showSub('Vingt zombies, épaule contre épaule. Abats-les tous — la moindre erreur sera la dernière.', 4200);
+    for(let i=0;i<20;i++){
+      const m = new Monster({
+        az: wrapDeg(game.homeYaw - 57 + i*6),
+        dist: 20 + (i%3)*2.2,
+        type:'walker', speed:0.38
+      });
+      m.horde = true; m.aggro = true; m.alerted = true;
+      if(m.voice.ok) m.voice.grG.gain.value *= 0.35;
+      game.monsters.push(m);
+    }
+    AU.boom();
+    return;
+  }
+  game.queue = waveCount(n);
+  game.nextSpawn = T + 1.6;
   showMsg('VAGUE '+n, 2000);
   if(n===5) showSub('Ils débordent sur les côtés…', 2600);
   if(n===7) showSub('Ils arrivent de partout. Écoute derrière toi.', 2600);
+  if(n===19) showSub('La prochaine sera la dernière. Prépare-toi.', 3000);
   AU.boom();
 }
 function waveCleared(){
+  if(game.wave>=20){ victory(); return; }
   game.cleared = true;
   game.score += 40 + 10*game.wave;
   game.waveBreakT = 4;
   showMsg('VAGUE '+game.wave+' NETTOYÉE', 1900);
   showSub('Récupère ton souffle…', 1900);
   AU.chime();
+}
+function victory(){
+  game.monsters.forEach(m => m.voice.dispose());
+  game.state = 'win';
+  store.del('bf_run');
+  AU.setTension(0);
+  game.score += 500;
+  addCoins(2000);
+  endRunStats(true);
+  const isRec = game.score > game.best;
+  if(isRec){ game.best = game.score; store.set('bf_best', game.best); }
+  $('wStats').innerHTML =
+    'La Horde est anéantie. Le noir t’appartient.<br><br>' +
+    'Score : <em>'+game.score+'</em>' + (isRec ? ' <span class="rec">— record !</span>' : '') + '<br>' +
+    'Monstres abattus : <em>'+game.kills+'</em><br>' +
+    'Précision : <em>'+runPrec()+' %</em> · Réflexe moyen : <em>'+runRefl()+'</em><br>' +
+    'Récompense : <em>+2 000 🪙</em>';
+  elHud.classList.add('hidden');
+  elFire.classList.add('hidden');
+  $('win').classList.remove('hidden');
+  if(AU.ctx){ AU.chime(); setTimeout(()=>AU.chime(), 400); setTimeout(()=>AU.boom(), 800); }
 }
 function devour(m){
   if(game.state==='dying') return;
@@ -1378,11 +1671,13 @@ function gameOver(){
   game.state = 'over';
   store.del('bf_run');   // les 3 vies sont perdues : on repart de zéro
   AU.setTension(0);
+  endRunStats(false);
   const isRec = game.score > game.best;
   if(isRec){ game.best = game.score; store.set('bf_best', game.best); }
   elStats.innerHTML =
     'Vague atteinte : <em>'+game.wave+'</em><br>' +
     'Monstres abattus : <em>'+game.kills+'</em><br>' +
+    'Précision : <em>'+runPrec()+' %</em> · Réflexe : <em>'+runRefl()+'</em><br>' +
     'Score : <em>'+game.score+'</em>' +
     (isRec ? '<br><span class="rec">Nouveau record</span>' : '<br>Record : '+game.best);
   elHud.classList.add('hidden');
@@ -1394,7 +1689,9 @@ function showMenu(){
   resetRun();
   elBest.textContent = game.best>0 ? 'Record : '+game.best : '';
   updateResume();
+  refreshCoinsUI();
   elOver.classList.add('hidden');
+  $('win').classList.add('hidden');
   elHud.classList.add('hidden');
   elFire.classList.add('hidden');
   elMenu.classList.remove('hidden');
@@ -1478,9 +1775,10 @@ function fireGun(){
   const now = performance.now();
   if(now-lastFire<130) return;
   lastFire = now;
-  if(!loaded){ AU.dry(); return; }
-  loaded = false; reloadT = RELOAD;
-  AU.shot(); AU.reloadSfx();
+  if(mag<=0){ AU.dry(); return; }
+  mag--;
+  game.shots++;
+  AU.shot();
   flash = 1; recoil = 1; shake = Math.min(1, shake+0.45);
   let hit = null, zone = null;
   for(const m of game.monsters){
@@ -1488,7 +1786,12 @@ function fireGun(){
     const z = m.hitTest();
     if(z && (!hit || m.dist<hit.dist)){ hit = m; zone = z; }
   }
-  if(hit) hit.onHit(zone);
+  if(hit){ game.hits++; hit.onHit(zone); }
+  if(mag<=0){
+    const W2 = game.weapon || WEAPONS[1];
+    reloadT = W2.reload;
+    AU.reloadSfx(W2.reload);
+  }
   // tout le monde a entendu le coup de feu
   for(const m of game.monsters){
     if(m.dead || m===hit || m.frozen) continue;
@@ -1511,7 +1814,7 @@ function lightAt(d, m){
 function sim(dt){
   if(reloadT>0){
     reloadT -= dt;
-    if(reloadT<=0){ loaded = true; }
+    if(reloadT<=0){ mag = (game.weapon || WEAPONS[1]).shots; }
   }
   if(game.state==='dying'){
     game.dyingT += dt;
@@ -1965,16 +2268,18 @@ function drawCross(light){
 function hud(light){
   const inGame = game.state==='playing' || game.state==='tuto' || game.state==='dying';
   elDpad.classList.toggle('hidden', !inGame || Input.gyroActive);
+  const maxL = game.maxLives || 3;
   const lv = (game.state==='playing' || game.state==='dying') ? game.lives : -1;
-  if(lv !== lastLives){
-    lastLives = lv;
+  const lvKey = lv+'/'+maxL;
+  if(lvKey !== lastLives){
+    lastLives = lvKey;
     if(lv<0) elLivesEl.textContent = '';
     else if(HEART.ok){
       let h = '';
-      for(let i=0;i<3;i++) h += '<img src="'+(i<lv ? HEART.src : HEART.offSrc)+'" alt="">';
+      for(let i=0;i<maxL;i++) h += '<img src="'+(i<lv ? HEART.src : HEART.offSrc)+'" alt="">';
       elLivesEl.innerHTML = h;
     }else{
-      elLivesEl.textContent = '♥'.repeat(lv) + '♡'.repeat(Math.max(0, 3-lv));
+      elLivesEl.textContent = '♥'.repeat(lv) + '♡'.repeat(Math.max(0, maxL-lv));
     }
   }
   if(game.state==='playing' || game.state==='dying'){
@@ -1986,12 +2291,15 @@ function hud(light){
   }
   elMeter.style.height = Math.round(light*100)+'%';
   elSeen.style.opacity = seenT>0 ? 1 : 0;
-  if(loaded){
-    elRing.style.background = 'conic-gradient(var(--blood) 360deg, transparent 0)';
-  }else{
-    const p = clamp(1 - reloadT/RELOAD, 0, 1);
+  const Wp = game.weapon || WEAPONS[1];
+  if(reloadT>0){
+    const p = clamp(1 - reloadT/Wp.reload, 0, 1);
     elRing.style.background = 'conic-gradient(var(--blood) '+(p*360)+'deg, rgba(255,255,255,.08) 0)';
+  }else{
+    const f = clamp(mag/Wp.shots, 0, 1);
+    elRing.style.background = 'conic-gradient(var(--blood) '+(f*360)+'deg, rgba(255,255,255,.08) 0)';
   }
+  $('chestFill').style.width = Math.min(100, chestProg/600*100)+'%';
 }
 
 const elLivesEl = $('hLives');
@@ -2006,10 +2314,15 @@ function frame(ts){
   lastTs = ts;
   rdtG = rdt;
   T += rdt;
-  // temps de jeu cumulé (déverrouille la reprise de partie à 10 min)
+  // temps de jeu cumulé (reprise à 10 min) + progression du coffre
   if(game.state==='playing' || game.state==='tuto' || game.state==='dying'){
     ptime += rdt; ptimeFlush += rdt;
-    if(ptimeFlush>=5){ ptimeFlush = 0; store.set('bf_ptime', Math.round(ptime)); }
+    chestTick(rdt);
+    if(ptimeFlush>=5){
+      ptimeFlush = 0;
+      store.set('bf_ptime', Math.round(ptime));
+      store.set('bf_chest', Math.round(chestProg));
+    }
   }
   timeScale += (1-timeScale)*Math.min(1, rdt*5);
   const dt = rdt*timeScale;
@@ -2121,6 +2434,7 @@ function launch(mode){
   elGate.classList.add('hidden');
   elMenu.classList.add('hidden');
   elOver.classList.add('hidden');
+  $('win').classList.add('hidden');
   elHud.classList.remove('hidden');
   elFire.classList.remove('hidden');
   elCtl.textContent = Input.gyroActive
@@ -2253,9 +2567,155 @@ $('bTest').addEventListener('click', () => {
 });
 $('optFlash').addEventListener('change', e => { reducedFlash = e.target.checked; });
 
+// ---------------- boutique ----------------
+function renderShop(){
+  const owned = jget('bf_weapons', [1]);
+  const eqId = +(store.get('bf_weapon')||1);
+  let h = '';
+  for(const id of Object.keys(WEAPONS)){
+    const w = WEAPONS[id], iid = +id;
+    const has = owned.indexOf(iid)>=0 || iid===1;
+    let btn;
+    if(has && iid===eqId) btn = '<button class="buy eq" disabled>Équipée</button>';
+    else if(has) btn = '<button class="buy eq" data-w="'+iid+'">Équiper</button>';
+    else if(coins()>=w.price) btn = '<button class="buy can" data-w="'+iid+'">'+w.price+' 🪙</button>';
+    else btn = '<button class="buy" disabled>'+w.price+' 🪙</button>';
+    h += '<div class="item"><div class="nm">'+w.nm+' — '+w.shots+' coup'+(w.shots>1?'s':'')
+       + '<small>rechargement '+w.reload.toFixed(1).replace('.',',')+' s</small></div>'+btn+'</div>';
+  }
+  $('shopArmes').innerHTML = h;
+  let hb = '';
+  const b = boostState();
+  if(b.until){
+    const hrs = Math.ceil((b.until-Date.now())/3600e3);
+    hb += '<div class="item"><div class="nm">✨ Bonus actif : '+(b.weapon?'5 coups + ':'')
+        + '+'+b.lives+' vie'+(b.lives>1?'s':'')+'<small>encore ~'+hrs+' h</small></div></div>';
+  }
+  for(const bo of BOOSTS){
+    const btn = coins()>=bo.price
+      ? '<button class="buy can" data-b="'+bo.id+'">'+bo.price+' 🪙</button>'
+      : '<button class="buy" disabled>'+bo.price+' 🪙</button>';
+    hb += '<div class="item"><div class="nm">'+bo.nm+'<small>'+bo.det+'</small></div>'+btn+'</div>';
+  }
+  $('shopBoosts').innerHTML = hb;
+  refreshCoinsUI();
+  $('shopArmes').querySelectorAll('.buy[data-w]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const iid = +btn.dataset.w, w = WEAPONS[iid];
+      const own = jget('bf_weapons', [1]);
+      if(own.indexOf(iid)>=0 || iid===1){
+        store.set('bf_weapon', iid);
+        toast(w.nm+' équipée.');
+      }else if(coins()>=w.price){
+        addCoins(-w.price);
+        own.push(iid); jset('bf_weapons', own);
+        store.set('bf_weapon', iid);
+        toast(w.nm+' achetée et équipée !'); AU.chime();
+      }
+      renderShop();
+    });
+  });
+  $('shopBoosts').querySelectorAll('.buy[data-b]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const bo = BOOSTS.find(x => x.id===btn.dataset.b);
+      if(bo && coins()>=bo.price){
+        addCoins(-bo.price);
+        jset('bf_boost', {lives:bo.lives, weapon:bo.weapon, until: Date.now()+bo.dur});
+        toast('Bonus activé : '+bo.nm+' '+bo.det+' !'); AU.chime();
+        renderShop();
+      }
+    });
+  });
+}
+$('bShop').addEventListener('click', () => { AU.ui(); renderShop(); $('shop').classList.remove('hidden'); });
+$('shopBack').addEventListener('click', () => $('shop').classList.add('hidden'));
+
+// ---------------- profil, stats, parrainage ----------------
+const AVATARS = ['🌑','🧟','🐺','🦇','💀','👁️','🔥','🎯','🩸','🕯️'];
+const REF_TIERS = [[10,200],[20,400],[30,600],[50,1000]];
+function refCount(){ return +(store.get('bf_refs')||0); }
+function claimRefRewards(){
+  const claimed = jget('bf_refclaim', []);
+  for(const t of REF_TIERS){
+    if(refCount()>=t[0] && claimed.indexOf(t[0])<0){
+      claimed.push(t[0]);
+      addCoins(t[1]);
+      toast('🎉 '+t[0]+' amis invités : +'+t[1]+' pièces !');
+    }
+  }
+  jset('bf_refclaim', claimed);
+}
+function renderProfil(){
+  const p = getProfile();
+  $('avRow').innerHTML = AVATARS.map(a =>
+    '<button class="avBtn'+(a===p.avatar?' sel':'')+'" data-a="'+a+'">'+a+'</button>').join('');
+  $('avRow').querySelectorAll('.avBtn').forEach(bt => bt.addEventListener('click', () => {
+    const np = getProfile(); np.avatar = bt.dataset.a; jset('bf_profile', np); renderProfil();
+  }));
+  $('pName').value = p.name;
+  const st = jget('bf_stats', {shots:0,hits:0,kills:0,best:0,games:0,wins:0});
+  const prec = st.shots ? Math.round(100*st.hits/st.shots) : 0;
+  $('statsBox').innerHTML =
+    p.avatar+' <em>'+p.name+'</em><br>'
+    + 'Parties : <em>'+st.games+'</em> · Victoires (Horde) : <em>'+st.wins+'</em><br>'
+    + 'Monstres abattus : <em>'+st.kills+'</em><br>'
+    + 'Précision globale : <em>'+prec+' %</em> ('+st.hits+'/'+st.shots+' tirs)<br>'
+    + 'Meilleure vague : <em>'+st.best+'</em> · Record : <em>'+(game.best||0)+'</em><br>'
+    + 'Temps de jeu : <em>'+Math.floor(ptime/60)+' min</em>';
+  const list = jget('bf_scores', []);
+  $('lbBox').innerHTML = list.length
+    ? list.slice(0,5).map((e,i) => (i+1)+'. '+e.a+' '+e.n+' — <em>'+e.s+'</em> (vague '+e.w+')').join('<br>')
+    : 'Aucun score enregistré pour l’instant.';
+  const rc = refCount();
+  const next = REF_TIERS.find(t => rc<t[0]);
+  $('refBox').innerHTML =
+    'Amis invités : <em>'+rc+'</em><br>'
+    + (next ? 'Prochain palier : <em>'+next[0]+' amis → +'+next[1]+' 🪙</em>'
+            : 'Tous les paliers atteints — merci ! 🎉')
+    + '<br><small>10 → 200 🪙 · 20 → 400 🪙 · 30 → 600 🪙 · 50 → 1000 🪙</small>';
+}
+$('pName').addEventListener('change', () => {
+  const p = getProfile();
+  p.name = ($('pName').value.trim() || 'Chasseur').slice(0,14);
+  jset('bf_profile', p);
+  renderProfil();
+});
+$('bProfil').addEventListener('click', () => { AU.ui(); renderProfil(); $('profil').classList.remove('hidden'); });
+$('profilBack').addEventListener('click', () => $('profil').classList.add('hidden'));
+$('bShare').addEventListener('click', () => {
+  const data = {
+    title:'BLINDFIRE',
+    text:'Oseras-tu tirer dans le noir ? 🌑 Casque obligatoire.',
+    url:'https://thevisitappsolution-create.github.io/blindfire/'
+  };
+  const credit = () => { store.set('bf_refs', refCount()+1); claimRefRewards(); renderProfil(); };
+  if(navigator.share){
+    navigator.share(data).then(credit).catch(()=>{});
+  }else{
+    try{ navigator.clipboard.writeText(data.url); }catch(e){}
+    toast('Lien copié — envoie-le à un ami !');
+    credit();
+  }
+});
+
+// ---------------- mentions légales ----------------
+$('footLegal').addEventListener('click', () => $('legal').classList.remove('hidden'));
+$('legalBack').addEventListener('click', () => $('legal').classList.add('hidden'));
+$('bWipe').addEventListener('click', () => {
+  if(confirm('Effacer définitivement toutes tes données locales (profil, scores, pièces, sauvegarde) ?')){
+    try{ localStorage.clear(); }catch(e){}
+    location.reload();
+  }
+});
+
+// ---------------- victoire ----------------
+$('wAgain').addEventListener('click', () => { AU.ui(); begin('surv'); });
+$('wMenu').addEventListener('click', () => { AU.ui(); showMenu(); });
+
 elBest.textContent = game.best>0 ? 'Record : '+game.best : '';
 elCtl.textContent = 'Contrôles : gyroscope (activation à l’écran suivant)';
 updateResume();
+refreshCoinsUI();
 </script>
 
 </html>
