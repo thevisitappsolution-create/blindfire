@@ -1,3 +1,6 @@
-# Sons sources (WAV lourds, > limite GitHub) — racine uniquement ;
-# les versions compressées de docs/sons/ sont bien versionnées
+# Assets sources (lourds, > limite GitHub pour certains) — racine uniquement ;
+# les versions compressées de docs/ sont bien versionnées
 /Sons/
+/Monstre/
+/Logo Blinfire/
+/Vie/

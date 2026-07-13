@@ -57,11 +57,16 @@ Espace ou clic sur le bouton pour tirer.
   trop lourd) ; ils sont compressés en `.m4a` dans `docs/sons/` (ffmpeg, AAC 96k)
   et chargés par la version GitHub Pages — ambiance en boucle de 96 s et son de
   début de partie. La version artifact garde l'ambiance synthétique en repli.
-- **Bestiaire crescendo** : zombies (sprite fourni dans `Sons/Monstre`, détouré
-  et pré-assombri en 9 niveaux), quadrupèdes au sol (vague 2+), volants en
-  zigzag (4+), araignées à 6 pattes qui descendent du plafond (5+), hydres à
-  2 têtes — chaque tête doit être détruite (6+), téléporteurs (8+ : il change de
-  couleur, la seconde d'après il a bougé).
+- **Bestiaire illustré crescendo** : zombie, loup putréfié au sol (vague 2+),
+  chauve-souris en zigzag (4+) — sprites fournis dans `Monstre/`, détourés
+  (damier incrusté supprimé) et pré-assombris en 9 niveaux — plus téléporteurs
+  (8+ : il change de couleur, la seconde d'après il a bougé). Chaque créature a
+  ses propres pas : traînants (zombie), pattes feutrées rapides (loup),
+  battements d'ailes (chauve-souris).
+- **Dévoration** : la gueule du monstre qui t'attrape grossit en fondu jusqu'à
+  avaler l'écran (zoom sur la bouche), avec sang et hurlement.
+- **Pause** : bouton ⏸ en haut à droite en partie (auto-pause quand l'app passe
+  en arrière-plan) ; logo BlindFire fourni au menu (repli texte hors ligne).
 - **3 vies** : être dévoré coûte une vie et relance la vague en cours ; les trois
   perdues, on repart de zéro.
 - **Reprise de partie** : après 10 minutes de jeu cumulées, un bouton « Reprendre —

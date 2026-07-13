@@ -31,6 +31,16 @@
   }
   #hScore{font-variant-numeric:tabular-nums; color:var(--bone);}
   #hLives{color:var(--blood); font-size:15px; letter-spacing:.14em; text-indent:.14em;}
+  #hLives img{width:19px; height:19px; object-fit:contain; vertical-align:middle; margin-left:4px;}
+  #hLives img.off{opacity:.22; filter:grayscale(1);}
+  #pauseBtn{
+    position:absolute; top:calc(42px + env(safe-area-inset-top)); right:14px;
+    width:38px; height:38px; border-radius:9px; pointer-events:auto;
+    border:1px solid rgba(167,159,146,.3); background:rgba(3,3,6,.55);
+    color:var(--bone); font-size:13px; cursor:pointer; padding:0;
+    -webkit-tap-highlight-color:transparent;
+  }
+  #logoImg{width:min(340px,86vw); margin:-4px 0 2px;}
   #meter{
     position:absolute; right:12px; top:50%; transform:translateY(-50%);
     width:4px; height:30vh; background:rgba(167,159,146,.12); border-radius:2px;
@@ -207,6 +217,7 @@
       <div id="hLives" class="hudlab"></div>
       <div id="hScore" class="hudlab">0</div>
     </div>
+    <button id="pauseBtn" aria-label="Pause">&#10074;&#10074;</button>
     <div id="meter"><div id="meterFill"></div></div>
     <div id="meterLab">Exposition</div>
     <div id="seen">ils te voient</div>
@@ -233,7 +244,8 @@
 
   <div id="menu" class="screen">
     <div class="eclipse" aria-hidden="true"></div>
-    <h1>BLIND<b>FIRE</b></h1>
+    <h1 id="titleTxt">BLIND<b>FIRE</b></h1>
+    <img id="logoImg" alt="BlindFire" style="display:none">
     <p class="tag">Tes yeux mentent. Tes oreilles, jamais.</p>
     <div class="ear">&#127911; Écouteurs indispensables&nbsp;— ici, le son est ta vision.</div>
     <button id="bPlay" class="btn primary">Jouer</button>
@@ -244,7 +256,7 @@
     <div id="mBest" class="best"></div>
     <div id="mCtl"></div>
     <div class="foot">
-      BLINDFIRE v0.11 · prototype solo «&nbsp;Survie&nbsp;»<br>
+      BLINDFIRE v0.12 · prototype solo «&nbsp;Survie&nbsp;»<br>
       Astuce iPhone&nbsp;: Partager&nbsp;→ «&nbsp;Sur l’écran d’accueil&nbsp;» pour jouer en plein écran.
     </div>
   </div>
@@ -268,6 +280,13 @@
     <button id="bGyro" class="btn primary">Activer le gyroscope</button>
     <div id="gStat"></div>
     <button id="bTouch" class="btn ghost">Jouer en mode tactile (au doigt)</button>
+  </div>
+
+  <div id="pause" class="screen hidden">
+    <div class="eclipse" aria-hidden="true"></div>
+    <h2>PAUSE</h2>
+    <button id="bCont" class="btn primary">Continuer</button>
+    <button id="bPMenu" class="btn">Menu</button>
   </div>
 
   <div id="atest" class="screen hidden">
@@ -698,10 +717,8 @@ const BESTIARY = {
   spider: {spd:1.05, grF:[130,170], lfoF:1.5,  step:'tick'},
 };
 const BEAST_INTRO = {
-  crawler:'Quelque chose rampe au sol… vise bas.',
-  flyer:'Des ailes fendent l’air en zigzag…',
-  spider:'Ça descend du plafond… vise haut.',
-  hydra:'Deux têtes. Abats les deux.',
+  crawler:'Un loup putréfié rôde au sol… vise bas.',
+  flyer:'Une chauve-souris fend l’air en zigzag…',
 };
 
 // voix spatialisée d'un monstre
@@ -945,9 +962,9 @@ class Monster {
       const off = [-0.18, 0.18], hy = [1.54, 1.54];
       for(let i=0;i<this.heads.length;i++) if(this.heads[i]) heads.push({i:i, dx:off[i], h:hy[i], r:0.3});
     }else if(this.type==='crawler') heads = [{i:0, dx:0, h:0.75, r:0.3}];
-    else if(this.type==='flyer')    heads = [{i:0, dx:0, h:this.fh, r:0.32}];
+    else if(this.type==='flyer')    heads = [{i:0, dx:0, h:this.fh + (SPRITES.flyer.ok?0.16:0), r:0.32}];
     else if(this.type==='spider')   heads = [{i:0, dx:0, h:this.sh, r:0.34}];
-    else heads = [{i:0, dx:0, h:(this.type==='walker' && SPRITE.ok) ? 1.66 : 1.56, r:0.34}];
+    else heads = [{i:0, dx:0, h:(this.type==='walker' && SPRITES.walker.ok) ? 1.66 : 1.56, r:0.34}];
     for(const hd of heads){
       const rr = Math.max(2.3, ang(hd.r));
       if(Math.abs(dy - ang(hd.dx))<=rr && Math.abs(view.pitch - elev(hd.h))<=rr){
@@ -1031,14 +1048,20 @@ let reducedFlash = false;
 const dust = [];
 for(let i=0;i<44;i++) dust.push({az:rand(0,360), d:rand(0.8,6), h:rand(0.1,2.3), vh:rand(-0.05,0.08), va:rand(-3,3)});
 
-// sprite du marcheur : le zombie fourni dans Sons/Monstre, servi depuis monstres/
-// (pré-teinté en 9 niveaux d'obscurité ; repli silhouette dessinée si absent)
-const SPRITE = {ok:false, levels:[], aspect:0.82};
-(function(){
+// sprites des créatures (images fournies, détourées, servies depuis monstres/)
+// pré-teintés en 9 niveaux d'obscurité ; repli silhouette dessinée si absents.
+// mouth = point de la gueule (fraction de l'image) pour le zoom de dévoration.
+const SPRITES = {
+  walker: {src:'monstres/zombie.webp', hM:1.85, mouth:{x:0.5,  y:0.115}, ok:false, levels:[], aspect:0.8},
+  crawler:{src:'monstres/loup.webp',   hM:1.15, mouth:{x:0.47, y:0.47},  ok:false, levels:[], aspect:0.8},
+  flyer:  {src:'monstres/chauve.webp', hM:1.05, mouth:{x:0.5,  y:0.42},  ok:false, levels:[], aspect:0.8},
+};
+Object.keys(SPRITES).forEach(key => {
+  const S = SPRITES[key];
   const im = new Image();
   im.onload = () => {
-    SPRITE.aspect = im.width/im.height;
-    const HL = 720, WL = Math.max(1, Math.round(HL*SPRITE.aspect));
+    S.aspect = im.width/im.height;
+    const HL = 720, WL = Math.max(1, Math.round(HL*S.aspect));
     for(let i=0;i<9;i++){
       const cnv = document.createElement('canvas');
       cnv.width = WL; cnv.height = HL;
@@ -1047,12 +1070,20 @@ const SPRITE = {ok:false, levels:[], aspect:0.82};
       c2.globalCompositeOperation = 'source-atop';
       c2.fillStyle = 'rgba(0,0,0,'+(1 - i/8).toFixed(3)+')';
       c2.fillRect(0, 0, WL, HL);
-      SPRITE.levels.push(cnv);
+      S.levels.push(cnv);
     }
-    SPRITE.ok = true;
+    S.ok = true;
   };
   im.onerror = () => {};
-  im.src = 'monstres/zombie.webp';
+  im.src = S.src;
+});
+// cœur en image (dossier vie/) avec repli sur les ♥ texte
+const HEART = {ok:false, src:'vie/coeur.webp'};
+(function(){
+  const im = new Image();
+  im.onload = () => { HEART.ok = true; };
+  im.onerror = () => {};
+  im.src = HEART.src;
 })();
 
 // gouttes de sang sur l'écran (quand on se fait dévorer)
@@ -1086,7 +1117,18 @@ function drawBlood(){
     g.beginPath(); g.arc(b.x + wob, b.y0 + b.y, b.r*0.85, 0, TAU); g.fill();
   }
 }
-// visage d'épouvante qui surgit quand on est dévoré
+// dévoration : la gueule du monstre grossit en fondu jusqu'à avaler l'écran
+function drawDevourZoom(p, S){
+  const dw = lerp(Math.max(W,H)*1.05, Math.max(W,H)*13, p*p);
+  const dh = dw/S.aspect;
+  const j = reducedFlash ? 3 : 10;
+  const x = W/2 - dw*S.mouth.x + (Math.random()-0.5)*j;
+  const y = H/2 - dh*S.mouth.y + (Math.random()-0.5)*j;
+  g.globalAlpha = Math.min(1, p*3.5);
+  g.drawImage(S.levels[8], x, y, dw, dh);
+  g.globalAlpha = 1;
+}
+// visage d'épouvante dessiné (repli quand le sprite n'est pas chargé)
 function drawScareFace(p){
   const u = Math.min(W,H) * (0.55 + p*1.05);
   const jx = (Math.random()-0.5)*14, jy = (Math.random()-0.5)*14;
@@ -1201,10 +1243,8 @@ function spawnAz(){
 function pickType(){
   const w = game.wave;
   const bag = [['walker', 5]];
-  if(w>=2) bag.push(['crawler', Math.min(3.5, 0.8 + w*0.35)]);
-  if(w>=4) bag.push(['flyer',  Math.min(2.6, 0.4 + w*0.28)]);
-  if(w>=5) bag.push(['spider', Math.min(2.2, 0.3 + w*0.24)]);
-  if(w>=6) bag.push(['hydra',  Math.min(2.0, 0.2 + w*0.22)]);
+  if(w>=2) bag.push(['crawler', Math.min(4, 0.8 + w*0.4)]);
+  if(w>=4) bag.push(['flyer',  Math.min(3, 0.4 + w*0.3)]);
   let tot = 0; for(const b of bag) tot += b[1];
   let r = Math.random()*tot;
   for(const b of bag){ if((r -= b[1])<=0) return b[0]; }
@@ -1212,7 +1252,7 @@ function pickType(){
 }
 function spawnTyped(){
   const ty = pickType();
-  const tp = game.wave>=8 && (ty==='walker'||ty==='hydra'||ty==='crawler')
+  const tp = game.wave>=8 && (ty==='walker'||ty==='crawler')
           && Math.random() < 0.25 + (game.wave-8)*0.05;
   game.monsters.push(new Monster({az: spawnAz(), type: ty, tp: tp}));
   if(BEAST_INTRO[ty] && !game.seenTypes[ty]){
@@ -1630,8 +1670,12 @@ function render(light){
   }
   if(game.state==='dying'){
     const t = game.dyingT;
-    // le visage surgit en stroboscope (fixe si « flashs réduits »)
-    if(t>0.1 && t<0.75){
+    const ty = game.dyingM ? game.dyingM.type : 'walker';
+    const S = SPRITES[ty];
+    if(S && S.ok){
+      if(t>0.08 && t<1.3) drawDevourZoom(clamp((t-0.08)/1.1, 0, 1), S);
+    }else if(t>0.1 && t<0.75){
+      // repli : visage dessiné en stroboscope (fixe si « flashs réduits »)
       const p = (t-0.1)/0.65;
       if(reducedFlash || Math.floor(T*26)%3!==0) drawScareFace(p);
     }
@@ -1679,7 +1723,19 @@ function drawMonster(m){
   g.lineCap = 'round'; g.lineJoin = 'round';
   g.fillStyle = col; g.strokeStyle = col;
 
-  if(m.type==='crawler'){
+  if(m.type==='crawler' && SPRITES.crawler.ok){
+    // loup putréfié illustré, assombri selon la lumière reçue
+    const S = SPRITES.crawler, hM = S.hM, wM = hM*S.aspect;
+    if(tpWarn){
+      g.fillStyle = 'rgba(150,70,220,0.32)';
+      g.beginPath(); g.ellipse(0, 0.6, 0.62, 0.6, 0, 0, TAU); g.fill();
+    }
+    const lvl = S.levels[Math.round(clamp(br,0,1)*8)];
+    g.rotate(Math.sin(m.phase*TAU)*0.04);
+    g.save(); g.scale(1,-1);
+    g.drawImage(lvl, -wM/2, -hM, wM, hM);
+    g.restore();
+  }else if(m.type==='crawler'){
     // bête à 4 pattes, au ras du sol
     g.lineWidth = 0.07;
     g.beginPath();
@@ -1696,6 +1752,16 @@ function drawMonster(m){
     g.fill();
     g.beginPath(); g.arc(0, 0.75, 0.13, 0, TAU); g.fill();
     if(wind){ g.beginPath(); g.ellipse(0, 0.62, 0.08, 0.1, 0, 0, TAU); g.fill(); }
+  }else if(m.type==='flyer' && SPRITES.flyer.ok){
+    // chauve-souris illustrée, battement d'ailes simulé
+    const S = SPRITES.flyer, hM = S.hM;
+    const flap = Math.sin(m.phase*TAU*2.4);
+    const wM = hM*S.aspect*(1 + flap*0.06);
+    const lvl = S.levels[Math.round(clamp(br,0,1)*8)];
+    g.rotate(Math.sin(T*2.3 + m.seed*12)*0.07);
+    g.save(); g.scale(1,-1);
+    g.drawImage(lvl, -wM/2, -(m.fh + hM/2), wM, hM);
+    g.restore();
   }else if(m.type==='flyer'){
     // bête volante en zigzag
     const h = m.fh;
@@ -1729,14 +1795,15 @@ function drawMonster(m){
     g.stroke();
     g.beginPath(); g.ellipse(0, h+0.08, 0.24, 0.2, 0, 0, TAU); g.fill();
     g.beginPath(); g.arc(0, h-0.12, 0.13, 0, TAU); g.fill();
-  }else if(m.type==='walker' && SPRITE.ok){
+  }else if(m.type==='walker' && SPRITES.walker.ok){
     // zombie illustré, assombri selon la lumière qu'il reçoit
-    const hM = 1.85, wM = hM*SPRITE.aspect;
+    const S = SPRITES.walker;
+    const hM = S.hM, wM = hM*S.aspect;
     if(tpWarn){
       g.fillStyle = 'rgba(150,70,220,0.32)';
       g.beginPath(); g.ellipse(0, 0.95, 0.55, 1.05, 0, 0, TAU); g.fill();
     }
-    const lvl = SPRITE.levels[Math.round(clamp(br,0,1)*8)];
+    const lvl = S.levels[Math.round(clamp(br,0,1)*8)];
     g.rotate(Math.sin(m.phase*TAU)*0.05);
     g.save(); g.scale(1,-1);
     g.drawImage(lvl, -wM/2, -hM, wM, hM);
@@ -1806,9 +1873,11 @@ function drawMonster(m){
       const off = [-0.18, 0.18], hy = [1.56, 1.56];
       for(let i=0;i<off.length;i++) if(m.heads[i]) eyes.push({x:off[i]-0.04,h:hy[i]},{x:off[i]+0.04,h:hy[i]});
     }else if(m.type==='crawler') eyes=[{x:-0.045,h:0.76},{x:0.045,h:0.76}];
-    else if(m.type==='flyer') eyes=[{x:-0.06,h:m.fh+0.03},{x:0.06,h:m.fh+0.03}];
+    else if(m.type==='flyer') eyes = SPRITES.flyer.ok
+      ? [{x:-0.05,h:m.fh+0.17},{x:0.05,h:m.fh+0.17}]
+      : [{x:-0.06,h:m.fh+0.03},{x:0.06,h:m.fh+0.03}];
     else if(m.type==='spider') eyes=[{x:-0.09,h:m.sh-0.14},{x:-0.03,h:m.sh-0.09},{x:0.03,h:m.sh-0.09},{x:0.09,h:m.sh-0.14}];
-    else if(m.type==='walker' && SPRITE.ok) eyes=[{x:-0.033,h:1.7},{x:0.033,h:1.7}];
+    else if(m.type==='walker' && SPRITES.walker.ok) eyes=[{x:-0.033,h:1.7},{x:0.033,h:1.7}];
     else eyes=[{x:-0.052,h:1.58},{x:0.052,h:1.58}];
     const r = Math.max(1.3, 0.021*k*(m.type==='spider' ? 0.7 : 1));
     const ec = tpWarn ? '190,120,255' : wind ? '255,70,50' : '255,233,184';
@@ -1877,8 +1946,18 @@ function drawCross(light){
 function hud(light){
   const inGame = game.state==='playing' || game.state==='tuto' || game.state==='dying';
   elDpad.classList.toggle('hidden', !inGame || Input.gyroActive);
-  $('hLives').textContent = (game.state==='playing' || game.state==='dying')
-    ? '♥'.repeat(game.lives) + '♡'.repeat(Math.max(0, 3-game.lives)) : '';
+  const lv = (game.state==='playing' || game.state==='dying') ? game.lives : -1;
+  if(lv !== lastLives){
+    lastLives = lv;
+    if(lv<0) elLivesEl.textContent = '';
+    else if(HEART.ok){
+      let h = '';
+      for(let i=0;i<3;i++) h += '<img src="'+HEART.src+'"'+(i<lv?'':' class="off"')+' alt="">';
+      elLivesEl.innerHTML = h;
+    }else{
+      elLivesEl.textContent = '♥'.repeat(lv) + '♡'.repeat(Math.max(0, 3-lv));
+    }
+  }
   if(game.state==='playing' || game.state==='dying'){
     elWave.textContent = game.wave>0 ? 'Vague '+game.wave : '';
     elScore.textContent = game.score;
@@ -1895,6 +1974,9 @@ function hud(light){
     elRing.style.background = 'conic-gradient(var(--blood) '+(p*360)+'deg, rgba(255,255,255,.08) 0)';
   }
 }
+
+const elLivesEl = $('hLives');
+let lastLives = -2;
 
 // ---------------- boucle principale ----------------
 function frame(ts){
@@ -1951,9 +2033,46 @@ async function wakeLock(){
   try{ if(navigator.wakeLock) wl = await navigator.wakeLock.request('screen'); }catch(e){}
 }
 document.addEventListener('visibilitychange', () => {
-  if(document.hidden){ AU.suspend(); }
-  else{ AU.resume(); wakeLock(); }
+  if(document.hidden){
+    AU.suspend();
+    pauseGame();   // on quitte l'app en pleine partie → pause propre
+  }else{
+    if(game.state!=='paused') AU.resume();
+    wakeLock();
+  }
 });
+
+// ---------------- pause ----------------
+let pausedFrom = null;
+function pauseGame(){
+  if(game.state!=='playing' && game.state!=='tuto') return;
+  pausedFrom = game.state;
+  game.state = 'paused';
+  AU.suspend();
+  $('pause').classList.remove('hidden');
+}
+$('pauseBtn').addEventListener('click', e => { e.stopPropagation(); pauseGame(); });
+$('bCont').addEventListener('click', () => {
+  if(game.state!=='paused') return;
+  game.state = pausedFrom || 'playing';
+  AU.resume();
+  $('pause').classList.add('hidden');
+});
+$('bPMenu').addEventListener('click', () => {
+  $('pause').classList.add('hidden');
+  AU.resume();
+  showMenu();
+});
+
+// logo du menu (remplace le titre texte s'il se charge ; la lune reste)
+(function(){
+  const li = $('logoImg');
+  li.addEventListener('load', () => {
+    li.style.display = 'block';
+    $('titleTxt').style.display = 'none';
+  });
+  li.src = 'logo.webp';
+})();
 
 const elGate = $('gate'), elGStat = $('gStat');
 let pendingMode = 'surv';
