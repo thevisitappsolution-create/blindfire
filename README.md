@@ -21,7 +21,8 @@ Le prototype est une web-app autonome. **Lien principal (gyroscope actif)** :
 
 1. Ouvre le lien **directement dans Safari** sur ton iPhone (pas dans le navigateur
    intégré d'une autre app — les capteurs de mouvement y sont souvent bloqués).
-2. Branche tes **écouteurs** (indispensable — le son est le jeu).
+2. **Casque ou écouteurs fortement conseillés** (le son 3D est le cœur du jeu),
+   mais le jeu reste entièrement jouable sur haut-parleur, enceinte Bluetooth ou TV.
 3. Touche **JOUER**, puis sur l'écran « Capteurs » touche **ACTIVER LE GYROSCOPE**
    et accepte la demande iOS « Mouvement et orientation ». L'écran confirme
    « Gyroscope actif ✓ » quand les données arrivent, et t'explique quoi faire sinon.
