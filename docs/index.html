@@ -152,6 +152,10 @@
   .gateTxt{font-size:14px; color:var(--bone); max-width:320px; line-height:1.55; margin:0 0 6px;}
   #gStat{font-size:13px; color:var(--lamp); max-width:300px; line-height:1.5; min-height:44px;}
   #gStat a{color:var(--lamp); text-decoration:underline;}
+  .btnrow{display:flex; gap:10px; width:min(260px,80vw);}
+  .btnrow .btn{width:auto; flex:1; letter-spacing:.12em; text-indent:.12em; font-size:13px;}
+  .btn[disabled]{opacity:.35; pointer-events:none;}
+  #atStat{font-size:13px; color:var(--lamp); min-height:44px; max-width:300px; line-height:1.5;}
   #oStats{font-size:14px; line-height:2; color:var(--bone); font-variant-numeric:tabular-nums; margin-bottom:8px;}
   #oStats em{color:var(--lamp); font-style:normal;}
   #oStats .rec{color:var(--blood); letter-spacing:.2em; text-transform:uppercase; font-size:12px;}
@@ -204,12 +208,12 @@
     <div class="ear">&#127911; Écouteurs indispensables&nbsp;— ici, le son est ta vision.</div>
     <button id="bPlay" class="btn primary">Jouer</button>
     <button id="bTuto" class="btn">Tutoriel</button>
-    <button id="bTest" class="btn ghost">Tester le son 3D</button>
+    <button id="bTest" class="btn ghost">Test audio (casque)</button>
     <label class="opt"><input type="checkbox" id="optFlash"> Flashs réduits (photosensibilité)</label>
     <div id="mBest" class="best"></div>
     <div id="mCtl"></div>
     <div class="foot">
-      BLINDFIRE v0.1 · prototype solo «&nbsp;Survie&nbsp;»<br>
+      BLINDFIRE v0.4 · prototype solo «&nbsp;Survie&nbsp;»<br>
       Astuce iPhone&nbsp;: Partager&nbsp;→ «&nbsp;Sur l’écran d’accueil&nbsp;» pour jouer en plein écran.
     </div>
   </div>
@@ -232,6 +236,22 @@
     <button id="bGyro" class="btn primary">Activer le gyroscope</button>
     <div id="gStat"></div>
     <button id="bTouch" class="btn ghost">Jouer en mode tactile (au doigt)</button>
+  </div>
+
+  <div id="atest" class="screen hidden">
+    <div class="eclipse" aria-hidden="true"></div>
+    <h2>TEST AUDIO</h2>
+    <p class="gateTxt">
+      Mets ton casque. Un son va jouer d'un seul côté&nbsp;— indique d'où il vient,
+      trois fois de suite, pour vérifier que ta gauche et ta droite ne sont pas inversées.
+    </p>
+    <button id="atPlay" class="btn primary">Jouer un son</button>
+    <div class="btnrow">
+      <button id="atL" class="btn" disabled>&#8592; Gauche</button>
+      <button id="atR" class="btn" disabled>Droite &#8594;</button>
+    </div>
+    <div id="atStat"></div>
+    <button id="atBack" class="btn ghost">Retour au menu</button>
   </div>
 </div>
 
@@ -441,7 +461,7 @@ const AU = {
   panner(){
     const p = this.ctx.createPanner();
     p.panningModel='HRTF'; p.distanceModel='inverse';
-    p.refDistance=1.6; p.rolloffFactor=1.15; p.maxDistance=60;
+    p.refDistance=1.6; p.rolloffFactor=0.95; p.maxDistance=60;
     return p;
   },
   setPos(node,x,y,z){
@@ -459,13 +479,13 @@ const AU = {
   },
   startAmbience(){
     const c = this.ctx;
-    // souffle sourd
+    // souffle sourd (discret : il ne doit jamais masquer les pas)
     const n = this.noiseSrc(); n.loop = true;
     const lp = c.createBiquadFilter(); lp.type='lowpass'; lp.frequency.value = 95;
-    const ng = c.createGain(); ng.gain.value = 0.06;
+    const ng = c.createGain(); ng.gain.value = 0.03;
     n.connect(lp); lp.connect(ng); ng.connect(this.master); n.start();
     // bourdon battant
-    [[46,0.03],[46.7,0.022]].forEach(([f,v]) => {
+    [[46,0.017],[46.7,0.012]].forEach(([f,v]) => {
       const o = c.createOscillator(); o.type='sine'; o.frequency.value = f;
       const og = c.createGain(); og.gain.value = v;
       o.connect(og); og.connect(this.master); o.start();
@@ -531,19 +551,14 @@ const AU = {
     this.playTone(t+0.12, 0.5, 'sine', 990, 990, 0.1, this.master);
   },
   ui(){ if(this.ctx) this.playTone(this.ctx.currentTime, 0.03, 'square', 660, 500, 0.08, this.master); },
-  testPan(){
+  ping(azDeg){
     if(!this.ctx) return;
-    const seq = [[-90,'gauche…'],[0,'devant…'],[90,'droite…']];
-    seq.forEach(([az,txt],i) => {
-      setTimeout(()=>{
-        const c=this.ctx, t=c.currentTime;
-        const p=this.panner();
-        this.setPos(p, Math.sin(az*D2R)*3, 0, -Math.cos(az*D2R)*3);
-        p.connect(this.master);
-        this.playTone(t, 0.25, 'sine', 520, 500, 0.5, p);
-        showSub(txt, 700);
-      }, i*750);
-    });
+    const t = this.ctx.currentTime;
+    const p = this.panner();
+    this.setPos(p, Math.sin(azDeg*D2R)*2.5, 0, -Math.cos(azDeg*D2R)*2.5);
+    p.connect(this.master);
+    this.playTone(t, 0.18, 'sine', 620, 600, 0.55, p);
+    this.playTone(t+0.24, 0.18, 'sine', 620, 600, 0.55, p);
   },
   setTension(v){ if(this.tensionG) this.tensionG.gain.value = v; }
 };
@@ -579,8 +594,10 @@ class Voice {
   step(running){
     if(!this.ok) return;
     const t = AU.now();
-    AU.playNoise(t, 0.08, 'bandpass', rand(130,280), 100, running?0.8:0.55, this.in, 0.9);
-    AU.playTone(t, 0.09, 'sine', 84, 44, 0.3, this.in);
+    // impact sourd + craquement sec : le pas doit percer le fond sonore
+    AU.playNoise(t, 0.09, 'bandpass', rand(140,300), 90, running?1.5:1.05, this.in, 1.1);
+    AU.playNoise(t, 0.025, 'bandpass', rand(700,1200), 500, running?0.5:0.35, this.in, 1.5);
+    AU.playTone(t, 0.1, 'sine', 88, 42, running?0.55:0.4, this.in);
   }
   shriek(){
     if(!this.ok) return;
@@ -746,7 +763,7 @@ const game = {
   wave:0, score:0, kills:0,
   best:+(store.get('bf_best')||0),
   monsters:[], queue:0, nextSpawn:0, waveBreakT:0, cleared:false,
-  effLight:0, dyingM:null, dyingT:0, aimHot:false,
+  effLight:0, dyingM:null, dyingT:0, aimHot:false, homeYaw:0,
 };
 const tuto = {step:0, t:0, prog:0, az:0};
 const view = {yaw:0, pitch:-34};
@@ -811,16 +828,27 @@ function resetRun(){
 }
 function waveCount(n){ return Math.min(9, 1 + Math.floor((n-1)*0.8)); }
 function maxSimul(n){ return n>=6 ? 3 : n>=3 ? 2 : 1; }
+// Encerclement progressif : vagues 1-4 face à la position de départ (±90°),
+// 5-6 débordement (±135°), 7+ de partout.
+function spawnArc(n){ return n>=7 ? 180 : n>=5 ? 135 : 90; }
+function spawnAz(){
+  const arc = spawnArc(game.wave);
+  if(arc>=180) return rand(0,360);
+  return wrapDeg(game.homeYaw + rand(-arc,arc));
+}
 
 function startSurvival(){
   resetRun();
   game.state = 'playing';
+  game.homeYaw = wrapDeg(Input.yaw);
   beginWave(1);
 }
 function beginWave(n){
   game.wave = n; game.queue = waveCount(n); game.cleared = false;
   game.nextSpawn = T + 1.6;
   showMsg('VAGUE '+n, 2000);
+  if(n===5) showSub('Ils débordent sur les côtés…', 2600);
+  if(n===7) showSub('Ils arrivent de partout. Écoute derrière toi.', 2600);
   AU.boom();
 }
 function waveCleared(){
@@ -904,7 +932,7 @@ function tutoStep(n){
   }else if(n===4){
     showMsg('SURVIS');
     showSub('Il arrive. Écoute-le. Éclaire-le. Abats-le.');
-    game.monsters.push(new Monster({az:wrapDeg(view.yaw + rand(-120,120)), dist:13, speed:0.55}));
+    game.monsters.push(new Monster({az:wrapDeg(view.yaw + rand(-90,90)), dist:13, speed:0.55}));
   }
 }
 function tutoKill(){
@@ -1012,7 +1040,7 @@ function sim(dt){
     }else{
       const alive = game.monsters.filter(m=>!m.dead).length;
       if(game.queue>0 && alive<maxSimul(game.wave) && T>=game.nextSpawn){
-        game.monsters.push(new Monster({}));
+        game.monsters.push(new Monster({az: spawnAz()}));
         game.queue--;
         game.nextSpawn = T + rand(3,6.5);
       }
@@ -1165,8 +1193,11 @@ function drawMonster(m){
   const dy = angDiff(m.az, view.yaw);
   if(Math.abs(dy)>62) return;
   const la = lightAt(d, m);
-  const eyeFlk = 0.55 + 0.45*Math.sin(T*5.3 + m.seed*9);
-  let eyeA = clamp((1 - d/14)*eyeFlk + la*0.4, 0, 1);
+  // Les yeux luisent dans le noir : visibles dès l'apparition, de plus en plus
+  // brillants à mesure que la créature approche. Clignement rare pour l'angoisse.
+  const eyeFlk = 0.78 + 0.22*Math.sin(T*4.1 + m.seed*9);
+  const blink = Math.sin(T*0.9 + m.seed*23) > 0.985 ? 0.06 : 1;
+  let eyeA = clamp((0.2 + 0.8*Math.pow(1 - clamp(d/26,0,1), 1.35))*eyeFlk*blink + la*0.3, 0, 1);
   if(m.state==='windup') eyeA = 1;
   if(la<0.015 && eyeA<0.03 && m.revealT<=0) return;
 
@@ -1245,12 +1276,23 @@ function drawMonster(m){
   }
   g.restore();
 
-  // yeux (repère glaçant dans le noir)
+  // yeux (repère glaçant dans le noir : halo + point brillant)
   if(eyeA>0.02 && !dead){
-    const exOff = 0.052*k, eyY = feet.y - (1.58)*k*sq;
-    const r = Math.max(1, 0.02*k);
-    g.fillStyle = wind ? 'rgba(255,70,50,'+eyeA.toFixed(3)+')' : 'rgba(255,233,184,'+(eyeA*0.9).toFixed(3)+')';
-    g.beginPath(); g.arc(feet.x-exOff, eyY, r, 0, TAU); g.arc(feet.x+exOff, eyY, r, 0, TAU); g.fill();
+    const exOff = Math.max(1.6, 0.052*k), eyY = feet.y - 1.58*k*sq;
+    const r = Math.max(1.3, 0.021*k);
+    const ec = wind ? '255,70,50' : '255,233,184';
+    g.fillStyle = 'rgba('+ec+','+(eyeA*0.22).toFixed(3)+')';
+    g.beginPath();
+    g.arc(feet.x-exOff, eyY, r*3.2, 0, TAU);
+    g.moveTo(feet.x+exOff+r*3.2, eyY);
+    g.arc(feet.x+exOff, eyY, r*3.2, 0, TAU);
+    g.fill();
+    g.fillStyle = 'rgba('+ec+','+Math.min(1,eyeA*0.95).toFixed(3)+')';
+    g.beginPath();
+    g.arc(feet.x-exOff, eyY, r, 0, TAU);
+    g.moveTo(feet.x+exOff+r, eyY);
+    g.arc(feet.x+exOff, eyY, r, 0, TAU);
+    g.fill();
   }
 }
 
@@ -1439,6 +1481,56 @@ $('bTouch').addEventListener('click', () => {
   showSub('Mode tactile : glisse sur l’écran pour viser.', 3000);
 });
 
+// ---------------- test auditif gauche / droite ----------------
+const elAtest = $('atest'), elAtStat = $('atStat'),
+      elAtL = $('atL'), elAtR = $('atR'), elAtPlay = $('atPlay');
+const atest = {side:0, waiting:false, score:0};
+
+function atRound(){
+  if(elAtest.classList.contains('hidden')) return;
+  atest.side = Math.random()<0.5 ? -1 : 1;
+  atest.waiting = true;
+  elAtL.disabled = elAtR.disabled = false;
+  elAtPlay.textContent = 'Réécouter le son';
+  AU.ping(atest.side*90);
+}
+function atAnswer(s){
+  if(!atest.waiting) return;
+  atest.waiting = false;
+  elAtL.disabled = elAtR.disabled = true;
+  if(s === atest.side){
+    atest.score++;
+    AU.chime();
+    if(atest.score>=3){
+      elAtStat.textContent = '✓ 3 sur 3 — ton casque est bien réglé, l’audio 3D est prêt. Bonne chasse.';
+      elAtPlay.textContent = 'Recommencer le test';
+      atest.score = 0;
+      return;
+    }
+    elAtStat.textContent = '✓ Correct ('+atest.score+'/3)… écoute le suivant.';
+    setTimeout(atRound, 900);
+  }else{
+    atest.score = 0;
+    AU.dry();
+    elAtStat.textContent = '✗ Le son venait de '+(atest.side<0 ? 'GAUCHE' : 'DROITE')+'. '
+      + 'Ton casque est peut-être à l’envers — vérifie les repères L/R des écouteurs. On recommence.';
+    setTimeout(atRound, 2000);
+  }
+}
+elAtPlay.addEventListener('click', () => {
+  AU.init(); AU.resume();
+  if(atest.waiting){ AU.ping(atest.side*90); return; }
+  elAtStat.textContent = '';
+  atRound();
+});
+elAtL.addEventListener('click', () => atAnswer(-1));
+elAtR.addEventListener('click', () => atAnswer(1));
+$('atBack').addEventListener('click', () => {
+  atest.waiting = false; atest.score = 0;
+  elAtest.classList.add('hidden');
+  elMenu.classList.remove('hidden');
+});
+
 $('bPlay').addEventListener('click', () => {
   AU.ui();
   begin(store.get('bf_tuto') ? 'surv' : 'tuto');
@@ -1446,7 +1538,15 @@ $('bPlay').addEventListener('click', () => {
 $('bTuto').addEventListener('click', () => { AU.ui(); begin('tuto'); });
 $('bAgain').addEventListener('click', () => { AU.ui(); begin('surv'); });
 $('bMenu').addEventListener('click', () => { AU.ui(); showMenu(); });
-$('bTest').addEventListener('click', () => { AU.init(); AU.resume(); AU.testPan(); });
+$('bTest').addEventListener('click', () => {
+  AU.init(); AU.resume();
+  atest.waiting = false; atest.score = 0;
+  elAtStat.textContent = '';
+  elAtPlay.textContent = 'Jouer un son';
+  elAtL.disabled = elAtR.disabled = true;
+  elMenu.classList.add('hidden');
+  elAtest.classList.remove('hidden');
+});
 $('optFlash').addEventListener('change', e => { reducedFlash = e.target.checked; });
 
 elBest.textContent = game.best>0 ? 'Record : '+game.best : '';

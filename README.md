@@ -44,6 +44,12 @@ Espace ou clic sur le bouton pour tirer.
   Impossible d'être à la fois invisible et précis.
 - **Symétrie sonore** : tirer alerte tous les monstres ; la lumière les enrage.
 - **Tête = kill, corps = ralenti + repoussé + révélé** (contour rouge).
+- **Yeux luminescents** : chaque monstre se repère à ses yeux qui brillent dans le
+  noir, de plus en plus fort à mesure qu'il approche (avec clignements).
+- **Encerclement progressif** : vagues 1–4 face à la position de départ (±90°),
+  5–6 débordement (±135°), 7+ à 360° — annoncé en jeu.
+- **Test auditif gauche/droite** (menu) : trois sons à localiser pour vérifier
+  que le casque n'est pas inversé avant de jouer.
 - **Munition unique + rechargement** (1,4 s) — le tir raté coûte cher.
 - **Mode Survie** : vagues croissantes, score, record local.
 - **Tutoriel progressif** conforme au PRD : Écoute → Lumière → Tir → Survie.
