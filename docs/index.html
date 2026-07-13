@@ -247,7 +247,7 @@
     <div id="mBest" class="best"></div>
     <div id="mCtl"></div>
     <div class="foot">
-      BLINDFIRE v0.7 · prototype solo «&nbsp;Survie&nbsp;»<br>
+      BLINDFIRE v0.8 · prototype solo «&nbsp;Survie&nbsp;»<br>
       Astuce iPhone&nbsp;: Partager&nbsp;→ «&nbsp;Sur l’écran d’accueil&nbsp;» pour jouer en plein écran.
     </div>
   </div>
@@ -485,6 +485,21 @@ const AU = {
     dly.connect(fb); fb.connect(lp); lp.connect(dly);
     dly.connect(wet); wet.connect(this.master);
     this.echoIn = dly;
+    // réverbération de château hanté (réponse impulsionnelle synthétique ~3 s)
+    const irDur = 3.1, irLen = Math.floor(irDur*c.sampleRate);
+    const ir = c.createBuffer(2, irLen, c.sampleRate);
+    for(let ch=0; ch<2; ch++){
+      const dd = ir.getChannelData(ch);
+      for(let i=0;i<irLen;i++){
+        const tt = i/irLen;
+        dd[i] = (Math.random()*2-1) * Math.pow(1-tt, 2.1) * (0.35 + 0.65*Math.exp(-tt*5));
+      }
+    }
+    const hall = c.createConvolver(); hall.buffer = ir;
+    const hallLP = c.createBiquadFilter(); hallLP.type='lowpass'; hallLP.frequency.value = 2300;
+    const hallG = c.createGain(); hallG.gain.value = 0.55;
+    this.hallIn = c.createGain(); this.hallIn.gain.value = 1;
+    this.hallIn.connect(hall); hall.connect(hallLP); hallLP.connect(hallG); hallG.connect(this.master);
     // bruit blanc partagé (2 s)
     const len = 2*c.sampleRate;
     this.noiseBuf = c.createBuffer(1, len, c.sampleRate);
@@ -575,6 +590,8 @@ const AU = {
     p.connect(this.master);
     const eg = c.createGain(); eg.gain.value = 0.8;
     p.connect(eg); eg.connect(this.echoIn);
+    const hg = c.createGain(); hg.gain.value = 0.7;
+    p.connect(hg); hg.connect(this.hallIn);
     this.playTone(t, 0.06, 'sine', rand(1500,2300), 480, 0.35, p);
   },
   thump(vol){
@@ -591,6 +608,8 @@ const AU = {
     this.playNoise(t, 0.02, 'highpass', 3500, 3500, 0.5, this.master);
     const eg = c.createGain(); eg.gain.value = 0.9; eg.connect(this.echoIn);
     this.playNoise(t, 0.2, 'lowpass', 3000, 500, 0.7, eg);
+    const hg = c.createGain(); hg.gain.value = 0.45; hg.connect(this.hallIn);
+    this.playNoise(t, 0.25, 'lowpass', 2400, 400, 0.6, hg);
   },
   dry(){
     if(!this.ctx) return;
@@ -611,6 +630,7 @@ const AU = {
     const t = this.ctx.currentTime;
     this.playTone(t, 0.7, 'sine', 62, 30, 0.55, this.master);
     this.playNoise(t, 0.4, 'lowpass', 220, 100, 0.22, this.master);
+    this.playNoise(t, 0.5, 'lowpass', 400, 150, 0.3, this.hallIn);
   },
   bite(){
     if(!this.ctx) return;
@@ -673,10 +693,20 @@ const Whisper = {
       const u = new SpeechSynthesisUtterance(txt);
       if(this.voice) u.voice = this.voice;
       u.lang = 'fr-FR';
-      u.pitch = opts.pitch!=null ? opts.pitch : 0.1 + Math.random()*0.35;
-      u.rate = opts.rate!=null ? opts.rate : 0.6 + Math.random()*0.2;
-      u.volume = opts.vol!=null ? opts.vol : 0.9;
+      u.pitch = opts.pitch!=null ? opts.pitch : 0.05 + Math.random()*0.25;
+      u.rate = opts.rate!=null ? opts.rate : 0.55 + Math.random()*0.15;
+      u.volume = opts.vol!=null ? opts.vol : 0.5;   // pas fort, mais prenant
       speechSynthesis.speak(u);
+      if(!opts.noEcho){
+        // écho fantôme : la même phrase, répercutée par les murs, plus grave et lointaine
+        const e = new SpeechSynthesisUtterance(txt);
+        if(this.voice) e.voice = this.voice;
+        e.lang = 'fr-FR';
+        e.pitch = Math.max(0.01, u.pitch - 0.05);
+        e.rate = u.rate*0.9;
+        e.volume = 0.16;
+        speechSynthesis.speak(e);
+      }
     }catch(e){}
   },
   stop(){ try{ if('speechSynthesis' in window) speechSynthesis.cancel(); }catch(e){} }
@@ -714,6 +744,8 @@ class Voice {
     this.in.connect(this.filt); this.filt.connect(this.pan); this.pan.connect(AU.master);
     this.echoG = c.createGain(); this.echoG.gain.value = 0.4;
     this.pan.connect(this.echoG); this.echoG.connect(AU.echoIn);
+    this.hallG = c.createGain(); this.hallG.gain.value = 0.5;
+    this.pan.connect(this.hallG); this.hallG.connect(AU.hallIn);
     // grognement / respiration continue
     this.gr = c.createOscillator(); this.gr.type='sawtooth';
     this.grF0 = rand(B.grF[0], B.grF[1]); this.gr.frequency.value = this.grF0;
@@ -760,7 +792,9 @@ class Voice {
   whisperCue(){
     if(!this.ok) return;
     const t = AU.now();
-    AU.playNoise(t, 0.5, 'bandpass', 3200, 1600, 0.5, this.in, 0.7);
+    // souffle long et feutré qui s'engouffre dans la réverbération du château
+    AU.playNoise(t, 1.1, 'bandpass', 2800, 1100, 0.32, this.in, 0.7);
+    AU.playNoise(t+0.15, 1.4, 'bandpass', 2200, 800, 0.28, AU.hallIn, 0.7);
   }
   tpWhoosh(){
     if(!this.ok) return;
@@ -812,7 +846,7 @@ class Voice {
     if(!this.ok || this.disposed) return;
     this.disposed = true;
     try{ this.gr.stop(); this.lfo.stop(); if(this.gr2) this.gr2.stop(); }catch(e){}
-    try{ this.in.disconnect(); this.pan.disconnect(); this.echoG.disconnect(); }catch(e){}
+    try{ this.in.disconnect(); this.pan.disconnect(); this.echoG.disconnect(); this.hallG.disconnect(); }catch(e){}
   }
 }
 
@@ -1222,7 +1256,7 @@ function devour(m){
   const wasTuto = game.state==='tuto';
   game.state = 'dying'; game.dyingM = m; game.dyingT = 0;
   game._backToTuto = wasTuto;
-  Whisper.say('en voilà un bon repas…', {pitch:0.1, rate:0.85});
+  Whisper.say('en voilà un bon repas…', {pitch:0.05, rate:0.8, vol:0.65});
   AU.bite(); AU.scare();
   splatterBlood();
   shake = 1.6;
