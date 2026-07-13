@@ -247,7 +247,7 @@
     <div id="mBest" class="best"></div>
     <div id="mCtl"></div>
     <div class="foot">
-      BLINDFIRE v0.8 · prototype solo «&nbsp;Survie&nbsp;»<br>
+      BLINDFIRE v0.9 · prototype solo «&nbsp;Survie&nbsp;»<br>
       Astuce iPhone&nbsp;: Partager&nbsp;→ «&nbsp;Sur l’écran d’accueil&nbsp;» pour jouer en plein écran.
     </div>
   </div>
@@ -669,50 +669,7 @@ const AU = {
   setTension(v){ if(this.tensionG) this.tensionG.gain.value = v; }
 };
 
-// ---------------- chuchotements parlés (synthèse vocale, style sorcière/zombie) ----------------
-const Whisper = {
-  voice:null,
-  init(){
-    try{
-      if(!('speechSynthesis' in window)) return;
-      const pick = () => {
-        const vs = speechSynthesis.getVoices();
-        this.voice = vs.find(v => v.lang && v.lang.indexOf('fr')===0) || null;
-      };
-      pick();
-      speechSynthesis.onvoiceschanged = pick;
-      // amorce silencieuse dans le geste utilisateur (iOS)
-      const u = new SpeechSynthesisUtterance(' ');
-      u.volume = 0; speechSynthesis.speak(u);
-    }catch(e){}
-  },
-  say(txt, opts){
-    try{
-      if(!('speechSynthesis' in window) || speechSynthesis.speaking) return;
-      opts = opts || {};
-      const u = new SpeechSynthesisUtterance(txt);
-      if(this.voice) u.voice = this.voice;
-      u.lang = 'fr-FR';
-      u.pitch = opts.pitch!=null ? opts.pitch : 0.05 + Math.random()*0.25;
-      u.rate = opts.rate!=null ? opts.rate : 0.55 + Math.random()*0.15;
-      u.volume = opts.vol!=null ? opts.vol : 0.5;   // pas fort, mais prenant
-      speechSynthesis.speak(u);
-      if(!opts.noEcho){
-        // écho fantôme : la même phrase, répercutée par les murs, plus grave et lointaine
-        const e = new SpeechSynthesisUtterance(txt);
-        if(this.voice) e.voice = this.voice;
-        e.lang = 'fr-FR';
-        e.pitch = Math.max(0.01, u.pitch - 0.05);
-        e.rate = u.rate*0.9;
-        e.volume = 0.16;
-        speechSynthesis.speak(e);
-      }
-    }catch(e){}
-  },
-  stop(){ try{ if('speechSynthesis' in window) speechSynthesis.cancel(); }catch(e){} }
-};
-const WHISPERS_IDLE = ['par ici…','hé ho…','on a faim…','viens…','on te sent…','tout près…'];
-const WHISPERS_AGGRO = ['j’arriiiive…','je te vois…','à moi !'];
+// souffles chuchotés des créatures (spatialisés, noyés dans la réverbération)
 const whisper = {next: 8};
 
 // ---------------- bestiaire ----------------
@@ -883,8 +840,6 @@ class Monster {
     if(this.aggro || this.dead || this.frozen) return;
     this.aggro = true;
     this.voice.shriek();
-    if(Math.random()<0.35)
-      Whisper.say(WHISPERS_AGGRO[Math.floor(Math.random()*WHISPERS_AGGRO.length)], {rate:0.8});
     showSeen();
   }
   windup(){
@@ -1186,7 +1141,6 @@ function resetRun(){
   game.queue = 0; game.waveBreakT = 0; game.dyingM = null;
   game.seenTypes = {};
   blood.length = 0;
-  Whisper.stop();
   loaded = true; reloadT = 0; flash = 0; recoil = 0; shake = 0; timeScale = 1;
   hb.next = T + 0.6;
   whisper.next = T + rand(7,12);
@@ -1256,7 +1210,6 @@ function devour(m){
   const wasTuto = game.state==='tuto';
   game.state = 'dying'; game.dyingM = m; game.dyingT = 0;
   game._backToTuto = wasTuto;
-  Whisper.say('en voilà un bon repas…', {pitch:0.05, rate:0.8, vol:0.65});
   AU.bite(); AU.scare();
   splatterBlood();
   shake = 1.6;
@@ -1280,7 +1233,6 @@ function gameOver(){
   game.monsters.forEach(m => m.voice.dispose());
   game.state = 'over';
   AU.setTension(0);
-  Whisper.stop();
   const isRec = game.score > game.best;
   if(isRec){ game.best = game.score; store.set('bf_best', game.best); }
   elStats.innerHTML =
@@ -1469,16 +1421,11 @@ function audioFrame(){
     hb.next = T + lerp(1.3, 0.34, Math.pow(danger,1.25));
     hb.pulse = 1;
   }
-  // chuchotements des créatures (« par ici… », « on a faim… »)
+  // souffles chuchotés des créatures, à leur position
   if(active && game.state!=='dying' && T>=whisper.next){
     const alive = game.monsters.filter(m => !m.dead && !m.frozen);
     if(alive.length){
-      const m = alive[Math.floor(Math.random()*alive.length)];
-      m.voice.whisperCue();
-      setTimeout(() => {
-        if(game.state==='playing'||game.state==='tuto')
-          Whisper.say(WHISPERS_IDLE[Math.floor(Math.random()*WHISPERS_IDLE.length)]);
-      }, 350);
+      alive[Math.floor(Math.random()*alive.length)].voice.whisperCue();
     }
     whisper.next = T + rand(9,17);
   }
@@ -1911,7 +1858,6 @@ const PAGES_LINK = '<br><a href="'+PAGES_URL+'">&#10132; Ouvrir la version «&nb
 
 function begin(mode){
   AU.init(); AU.resume();
-  Whisper.init();
   wakeLock();
   if(Input.gyroActive){ launch(mode); return; }
   pendingMode = mode;

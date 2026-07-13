@@ -60,9 +60,9 @@ Espace ou clic sur le bouton pour tirer.
   leur vitesse max. Et leurs yeux brillent d'autant plus qu'il fait sombre
   (l'inverse en pleine lumière).
 - **Épouvante** : gouttes de sang sur l'écran et visage horrifique en jumpscare
-  quand on est dévoré ; chuchotements parlés en français (« par ici… »,
-  « on a faim… », « j'arriiiive… ») via la synthèse vocale du téléphone, ralentie
-  et rendue gutturale.
+  quand on est dévoré ; souffles chuchotés spatialisés à la position des
+  créatures, noyés dans une réverbération de château hanté (réponse
+  impulsionnelle synthétique ~3 s sur tout l'univers sonore).
 - **Munition unique + rechargement** (1,4 s) — le tir raté coûte cher.
 - **Mode Survie** : vagues croissantes, score, record local.
 - **Tutoriel progressif** conforme au PRD : Écoute → Lumière → Tir → Survie.
