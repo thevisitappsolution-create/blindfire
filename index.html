@@ -211,7 +211,7 @@
     <div id="mBest" class="best"></div>
     <div id="mCtl"></div>
     <div class="foot">
-      BLINDFIRE v0.4 · prototype solo «&nbsp;Survie&nbsp;»<br>
+      BLINDFIRE v0.5 · prototype solo «&nbsp;Survie&nbsp;»<br>
       Astuce iPhone&nbsp;: Partager&nbsp;→ «&nbsp;Sur l’écran d’accueil&nbsp;» pour jouer en plein écran.
     </div>
   </div>
@@ -229,7 +229,8 @@
     <p class="gateTxt">
       BLINDFIRE se joue avec le corps&nbsp;: <b>tourne-toi</b> physiquement pour balayer la
       pièce, <b>lève le téléphone à la verticale</b> (comme pour prendre une photo)
-      pour éclairer à pleine puissance.
+      pour éclairer à pleine puissance. Tu peux aussi <b>glisser un doigt</b> sur
+      l'écran pour ajuster ta rotation gauche/droite.
     </p>
     <button id="bGyro" class="btn primary">Activer le gyroscope</button>
     <div id="gStat"></div>
@@ -284,7 +285,7 @@ const store = {
 };
 
 const EYE = 1.5;            // hauteur des yeux du joueur (m)
-const LIGHT_RANGE = 16;     // portée de ta lumière (m)
+const LIGHT_RANGE = 20;     // portée de ta lumière (m)
 const RELOAD = 1.4;         // secondes
 
 // ---------------- DOM ----------------
@@ -308,10 +309,14 @@ fit();
 
 // ---------------- capteurs / visée ----------------
 const Input = {
-  mode:'touch', gyroActive:false, yaw:0, pitch:-34,
+  mode:'touch', gyroActive:false, yaw:0, pitch:-34, touchYaw:0,
   _drag:null,
   drag(dx,dy){
-    if(this.gyroActive) return;
+    if(this.gyroActive){
+      // même au gyroscope, on peut pivoter gauche/droite au doigt
+      this.touchYaw += dx*0.26;
+      return;
+    }
     this.yaw = wrapDeg(this.yaw + dx*0.26);
     this.pitch = clamp(this.pitch - dy*0.26, -75, 55);
   }
@@ -761,7 +766,7 @@ const game = {
   wave:0, score:0, kills:0,
   best:+(store.get('bf_best')||0),
   monsters:[], queue:0, nextSpawn:0, waveBreakT:0, cleared:false,
-  effLight:0, dyingM:null, dyingT:0, aimHot:false, homeYaw:0,
+  effLight:0, dyingM:null, dyingT:0, aimZone:null, homeYaw:0,
 };
 const tuto = {step:0, t:0, prog:0, az:0};
 const view = {yaw:0, pitch:-34};
@@ -838,7 +843,7 @@ function spawnAz(){
 function startSurvival(){
   resetRun();
   game.state = 'playing';
-  game.homeYaw = wrapDeg(Input.yaw);
+  game.homeYaw = wrapDeg(Input.yaw + Input.touchYaw);
   beginWave(1);
 }
 function beginWave(n){
@@ -1045,10 +1050,13 @@ function sim(dt){
       if(game.queue===0 && alive===0) waveCleared();
     }
   }
-  // le viseur "sent" une tête éclairée
-  game.aimHot = false;
+  // le viseur "sent" quand il passe sur un monstre (tête > corps)
+  game.aimZone = null;
   for(const m of game.monsters){
-    if(!m.dead && m.hitTest()==='head' && lightAt(m.dist,m)>0.22){ game.aimHot = true; break; }
+    if(m.dead) continue;
+    const z = m.hitTest();
+    if(z==='head'){ game.aimZone = 'head'; break; }
+    if(z==='body') game.aimZone = 'body';
   }
 }
 
@@ -1105,11 +1113,11 @@ function render(light){
   // halo de ta lampe
   if(el>0.02){
     let gr = g.createRadialGradient(W/2, H*0.88, 10, W/2, H*0.88, H*(0.3+0.8*el));
-    gr.addColorStop(0, 'rgba(201,185,138,'+(0.05+0.17*el).toFixed(3)+')');
+    gr.addColorStop(0, 'rgba(201,185,138,'+(0.07+0.22*el).toFixed(3)+')');
     gr.addColorStop(1, 'rgba(201,185,138,0)');
     g.fillStyle = gr; g.fillRect(0,0,W,H);
     gr = g.createRadialGradient(W/2, H*0.45, 10, W/2, H*0.45, H*0.85*el);
-    gr.addColorStop(0, 'rgba(190,178,140,'+(0.055*el).toFixed(3)+')');
+    gr.addColorStop(0, 'rgba(190,178,140,'+(0.08*el).toFixed(3)+')');
     gr.addColorStop(1, 'rgba(190,178,140,0)');
     g.fillStyle = gr; g.fillRect(0,0,W,H);
   }
@@ -1121,7 +1129,7 @@ function render(light){
       if(Math.abs(rp)>1.2) continue;
       const y = H/2 - Math.tan(rp)*f;
       if(y<0||y>H) continue;
-      const a = el*(1-d/15)*0.14;
+      const a = el*(1-d/15)*0.2;
       if(a<=0.004) continue;
       const gr = g.createLinearGradient(0,y,W,y);
       gr.addColorStop(0,'rgba(201,185,138,0)');
@@ -1171,7 +1179,7 @@ function render(light){
   // vignette + pulsation cardiaque
   let gr = g.createRadialGradient(W/2,H/2, Math.min(W,H)*0.32, W/2,H/2, Math.max(W,H)*0.75);
   gr.addColorStop(0,'rgba(0,0,0,0)');
-  gr.addColorStop(1,'rgba(0,0,0,0.82)');
+  gr.addColorStop(1,'rgba(0,0,0,0.68)');
   g.fillStyle = gr; g.fillRect(0,0,W,H);
   const redA = hb.pulse*danger*0.3 + (game.state==='dying' ? Math.min(0.75, game.dyingT*0.9) : 0);
   if(redA>0.01){
@@ -1202,7 +1210,7 @@ function drawMonster(m){
   const feet = project(m.az, 0, d);
   const k = feet.f/d;
   const br = la;
-  const col = 'rgb('+Math.round(10+br*92)+','+Math.round(9+br*80)+','+Math.round(11+br*70)+')';
+  const col = 'rgb('+Math.round(14+br*118)+','+Math.round(13+br*104)+','+Math.round(15+br*92)+')';
 
   const wind = m.state==='windup';
   const dead = m.dead;
@@ -1316,18 +1324,31 @@ function drawGun(light){
 }
 
 function drawCross(light){
-  const a = 0.1 + 0.72*light;
   const cx = W/2, cy = H/2;
-  g.strokeStyle = game.aimHot ? 'rgba(224,54,44,'+a.toFixed(3)+')' : 'rgba(210,200,180,'+a.toFixed(3)+')';
-  g.lineWidth = 1.4;
+  const zone = game.aimZone;
+  // dégradé vert quand le viseur passe sur un monstre (intense sur la tête)
+  if(zone){
+    const glowA = zone==='head' ? 0.5 : 0.22;
+    const gr = g.createRadialGradient(cx, cy, 2, cx, cy, 46);
+    gr.addColorStop(0, 'rgba(92,255,132,'+glowA.toFixed(3)+')');
+    gr.addColorStop(0.55, 'rgba(92,255,132,'+(glowA*0.35).toFixed(3)+')');
+    gr.addColorStop(1, 'rgba(92,255,132,0)');
+    g.fillStyle = gr;
+    g.beginPath(); g.arc(cx, cy, 46, 0, TAU); g.fill();
+  }
+  const a = zone==='head' ? 0.95 : zone==='body' ? 0.75 : 0.22 + 0.6*light;
+  g.strokeStyle = zone
+    ? 'rgba(112,255,148,'+a.toFixed(3)+')'
+    : 'rgba(210,200,180,'+a.toFixed(3)+')';
+  g.lineWidth = zone==='head' ? 1.8 : 1.4;
   g.beginPath(); g.arc(cx, cy, 15, 0, TAU); g.stroke();
   g.beginPath();
   for(const [dx,dy] of [[0,-1],[0,1],[-1,0],[1,0]]){
     g.moveTo(cx+dx*9, cy+dy*9); g.lineTo(cx+dx*20, cy+dy*20);
   }
   g.stroke();
-  if(game.aimHot){
-    g.fillStyle = 'rgba(224,54,44,'+Math.min(1,a+0.25).toFixed(3)+')';
+  if(zone==='head'){
+    g.fillStyle = 'rgba(112,255,148,0.95)';
     g.beginPath(); g.arc(cx, cy, 2.6, 0, TAU); g.fill();
   }
 }
@@ -1366,7 +1387,7 @@ function frame(ts){
   const s = Input.gyroActive ? 0.1 : 0.45;
   const swY = Math.sin(T*0.9)*s + Math.sin(T*1.61)*s*0.6;
   const swP = Math.sin(T*1.13)*s*0.8 + Math.sin(T*0.77)*s*0.5;
-  view.yaw = wrapDeg(Input.yaw + swY);
+  view.yaw = wrapDeg(Input.yaw + Input.touchYaw + swY);
   view.pitch = clamp(Input.pitch + swP + recoil*3.2, -80, 60);
 
   flash = Math.max(0, flash - rdt*7);
@@ -1376,7 +1397,7 @@ function frame(ts){
   seenT = Math.max(0, seenT - rdt);
 
   const light = lightLevel();
-  game.effLight = clamp(light + flash*(reducedFlash?0.7:1.5) + 0.05, 0, 1.25);
+  game.effLight = clamp(light + flash*(reducedFlash?0.7:1.5) + 0.09, 0, 1.25);
 
   if(game.state==='playing' || game.state==='tuto' || game.state==='dying') sim(dt);
   audioFrame();
