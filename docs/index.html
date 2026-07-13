@@ -600,14 +600,15 @@ const AU = {
     if(!b || !this.ctx) return false;
     const c = this.ctx, t = c.currentTime;
     const s = c.createBufferSource(); s.buffer = b;
+    // très fort : le compresseur du master écrête proprement les pointes
     const gn = c.createGain();
-    gn.gain.setValueAtTime(0.9, t);
-    gn.gain.setValueAtTime(0.9, t+2.5);
-    gn.gain.exponentialRampToValueAtTime(0.001, t+5.5);
+    gn.gain.setValueAtTime(2.1, t);
+    gn.gain.setValueAtTime(2.1, t+3);
+    gn.gain.exponentialRampToValueAtTime(0.001, t+5.8);
     s.connect(gn); gn.connect(this.master);
-    const hg = c.createGain(); hg.gain.value = 0.5;
+    const hg = c.createGain(); hg.gain.value = 0.8;
     s.connect(hg); hg.connect(this.hallIn);
-    s.start(t); s.stop(t+5.6);
+    s.start(t); s.stop(t+5.9);
     return true;
   },
   startFileAmbience(){
