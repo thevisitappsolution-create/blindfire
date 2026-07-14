@@ -1444,37 +1444,6 @@ Object.keys(SPRITES).forEach(key => {
   im.onerror = () => {};
   im.src = S.src;
 });
-// ---------------- décor panoramique 360° (image équirectangulaire fournie) ----------------
-const PANO = {ok:false, img:null};
-(function(){
-  const im = new Image();
-  im.onload = () => { PANO.img = im; PANO.ok = true; };
-  im.onerror = () => {};
-  im.src = 'decors/pano.webp';
-})();
-function drawPano(el){
-  if(!PANO.ok) return;
-  const im = PANO.img, iw = im.width, ih = im.height;
-  const vFov = 62;
-  const hFov = 2*Math.atan(Math.tan(vFov/2*D2R)*W/H)/D2R;
-  const srcW = iw*hFov/360;
-  const srcH = ih*vFov/180;
-  let sx = ((view.yaw - hFov/2)/360*iw % iw + iw) % iw;
-  let sy = ih*(90 - (view.pitch + vFov/2))/180;
-  sy = clamp(sy, 0, ih - srcH);
-  // le décor se révèle avec ta lumière (toujours une trace dans le noir)
-  g.globalAlpha = clamp(0.14 + el*0.85, 0, 1);
-  if(sx + srcW <= iw){
-    g.drawImage(im, sx, sy, srcW, srcH, 0, 0, W, H);
-  }else{
-    const w1 = iw - sx;
-    const dw1 = w1/srcW*W;
-    g.drawImage(im, sx, sy, w1, srcH, 0, 0, dw1, H);
-    g.drawImage(im, 0, sy, srcW - w1, srcH, dw1, 0, W - dw1, H);
-  }
-  g.globalAlpha = 1;
-}
-
 // cœurs en image (fournis dans docs/Vie) avec repli sur les ♥ texte
 const HEART = {ok:false, src:'Vie/coeur.webp', offSrc:'Vie/coeur-vide.webp'};
 (function(){
@@ -2077,9 +2046,6 @@ function render(light){
 
   const el = game.effLight;
   const f = (H/2)/Math.tan(31*D2R);
-
-  // décor 360° qui tourne avec la visée, révélé par la lumière
-  drawPano(el);
 
   // halo de ta lampe
   if(el>0.02){
