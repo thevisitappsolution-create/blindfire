@@ -365,7 +365,7 @@
     <div id="mBest" class="best"></div>
     <div id="mCtl"></div>
     <div class="foot">
-      BLINDFIRE v0.17 bêta · déconseillé aux moins de 16 ans<br>
+      BLINDFIRE v0.18 bêta · déconseillé aux moins de 16 ans<br>
       Astuce iPhone&nbsp;: Partager&nbsp;→ «&nbsp;Sur l’écran d’accueil&nbsp;» pour le plein écran.
       · <a id="footLegal">Mentions légales &amp; confidentialité</a>
     </div>
@@ -479,9 +479,7 @@
       publicitaires, consentement ATT d’Apple).</p>
       <h4>Propriété intellectuelle</h4>
       <p>Le jeu, son code, ses visuels et ses sons sont protégés. Toute reproduction
-      non autorisée est interdite. © 2026 BLINDFIRE — tous droits réservés.
-      Modèle 3D «&nbsp;Zombie&nbsp;» par Quaternius (licence CC0)&nbsp;; moteur 3D
-      Three.js (licence MIT).</p>
+      non autorisée est interdite. © 2026 BLINDFIRE — tous droits réservés.</p>
       <p><i>Modèle de mentions à faire valider par un professionnel du droit avant
       toute exploitation commerciale (notamment pour l’App&nbsp;Store&nbsp;: politique
       de confidentialité accessible par URL publique, «&nbsp;nutrition labels&nbsp;»
@@ -1110,8 +1108,6 @@ class Monster {
     this.voice = new Voice(B);
     this.nextStep = AU.now() + Math.random()*0.6;
     this.voice.setPos(this.az, this.dist);
-    this.rig = null;
-    M3D.attach(this);
   }
   enrage(){
     if(this.aggro || this.dead || this.frozen) return;
@@ -1450,112 +1446,36 @@ Object.keys(SPRITES).forEach(key => {
   im.onerror = () => {};
   im.src = S.src;
 });
-// ---------------- zombie 3D (prototype Three.js, repli sprite automatique) ----------------
-// Modèle : « Zombie » par Quaternius (CC0). Bibliothèques auto-hébergées dans lib/.
-const M3D = {
-  on:false, failed:false, _loading:false, cv:null, renderer:null, scene:null,
-  camera:null, torch:null, tpl:null, tplScale:1, clips:null, simDt:0, _w:0, _h:0,
-  boot(){
-    if(this.on || this.failed || this._loading) return;
-    this._loading = true;
-    const load = src => new Promise((res, rej) => {
-      const s = document.createElement('script');
-      s.src = src; s.onload = res; s.onerror = rej;
-      document.head.appendChild(s);
-    });
-    load('lib/three.min.js')
-      .then(() => load('lib/GLTFLoader.js'))
-      .then(() => load('lib/SkeletonUtils.js'))
-      .then(() => new Promise((res, rej) => new THREE.GLTFLoader().load('monstres/zombie3d.glb', res, undefined, rej)))
-      .then(gltf => this.setup(gltf))
-      .catch(() => { this.failed = true; });
-  },
-  setup(gltf){
-    this.tpl = gltf.scene;
-    this.clips = gltf.animations;
-    const box = new THREE.Box3().setFromObject(this.tpl);
-    this.tplScale = 1.8/((box.max.y - box.min.y)||1);
-    this.cv = document.createElement('canvas');
-    this.renderer = new THREE.WebGLRenderer({canvas:this.cv, alpha:true, antialias:false, powerPreference:'low-power'});
-    this.renderer.setPixelRatio(Math.min(2, window.devicePixelRatio||1));
-    this.renderer.outputEncoding = THREE.sRGBEncoding;
-    this.scene = new THREE.Scene();
-    this.scene.fog = new THREE.FogExp2(0x000000, 0.085);
-    this.camera = new THREE.PerspectiveCamera(62, 1, 0.1, 60);
-    this.camera.position.set(0, EYE, 0);
-    this.camera.rotation.order = 'YXZ';
-    this.scene.add(new THREE.AmbientLight(0x30303a, 0.55));
-    this.torch = new THREE.PointLight(0xc9b98a, 0, 26, 2);
-    this.torch.position.set(0, EYE, 0.2);
-    this.scene.add(this.torch);
-    this.on = true;
-    game.monsters.forEach(m => { if(m.type==='walker' && !m.dead) this.attach(m); });
-  },
-  clip(name){
-    return this.clips.find(c => c.name===name)
-        || this.clips.find(c => c.name.indexOf(name)>=0);
-  },
-  attach(m){
-    if(!this.on || m.rig || m.type!=='walker') return;
-    const obj = THREE.SkeletonUtils.clone(this.tpl);
-    obj.scale.setScalar(this.tplScale);
-    const mixer = new THREE.AnimationMixer(obj);
-    mixer.clipAction(this.clip('Walk')).play();
-    this.scene.add(obj);
-    m.rig = {obj:obj, mixer:mixer, cur:'Walk'};
-  },
-  play(m, name, once){
-    if(!m.rig || m.rig.cur===name) return;
-    const c = this.clip(name); if(!c) return;
-    const from = m.rig.mixer.clipAction(this.clip(m.rig.cur));
-    const a = m.rig.mixer.clipAction(c);
-    a.reset();
-    if(once){ a.setLoop(THREE.LoopOnce, 1); a.clampWhenFinished = true; }
-    a.crossFadeFrom(from, 0.2, false);
-    a.play();
-    m.rig.cur = name;
-  },
-  detach(m){
-    if(m.rig){
-      this.scene.remove(m.rig.obj);
-      m.rig.mixer.stopAllAction();
-      m.rig = null;
-    }
-  },
-  clear(){ if(this.on) game.monsters.forEach(m => this.detach(m)); },
-  frame(rdt){
-    if(!this.on) return false;
-    let any = false;
-    for(const m of game.monsters){
-      if(!m.rig) continue;
-      any = true;
-      if(m.dead && m.rig.cur!=='Death') this.play(m, 'Death', true);
-      const r = m.az*D2R, d = Math.max(0.45, m.dist);
-      m.rig.obj.position.set(Math.sin(r)*d, 0, -Math.cos(r)*d);
-      m.rig.obj.rotation.y = -r;   // face au joueur (modèle orienté +Z)
-      if(!m.dead){
-        if(m.state==='windup') this.play(m, 'Punch');
-        else{
-          const want = (m.speedNow||0) > 2 ? 'Run' : 'Walk';
-          this.play(m, want);
-        }
-      }
-      const spd = m.dead ? 1 : clamp((m.speedNow||0)/1.15, 0.3, 2.6);
-      m.rig.mixer.update(this.simDt * spd);
-    }
-    if(this._w!==W || this._h!==H){
-      this._w = W; this._h = H;
-      this.renderer.setSize(W, H, false);
-      this.camera.aspect = W/H;
-      this.camera.updateProjectionMatrix();
-    }
-    this.camera.rotation.y = -view.yaw*D2R;
-    this.camera.rotation.x = view.pitch*D2R;
-    this.torch.intensity = clamp(game.effLight, 0, 1.3)*2.4;
-    this.renderer.render(this.scene, this.camera);
-    return any;
+// ---------------- décor panoramique 360° (image équirectangulaire fournie) ----------------
+const PANO = {ok:false, img:null};
+(function(){
+  const im = new Image();
+  im.onload = () => { PANO.img = im; PANO.ok = true; };
+  im.onerror = () => {};
+  im.src = 'decors/pano.webp';
+})();
+function drawPano(el){
+  if(!PANO.ok) return;
+  const im = PANO.img, iw = im.width, ih = im.height;
+  const vFov = 62;
+  const hFov = 2*Math.atan(Math.tan(vFov/2*D2R)*W/H)/D2R;
+  const srcW = iw*hFov/360;
+  const srcH = ih*vFov/180;
+  let sx = ((view.yaw - hFov/2)/360*iw % iw + iw) % iw;
+  let sy = ih*(90 - (view.pitch + vFov/2))/180;
+  sy = clamp(sy, 0, ih - srcH);
+  // le décor se révèle avec ta lumière (toujours une trace dans le noir)
+  g.globalAlpha = clamp(0.14 + el*0.85, 0, 1);
+  if(sx + srcW <= iw){
+    g.drawImage(im, sx, sy, srcW, srcH, 0, 0, W, H);
+  }else{
+    const w1 = iw - sx;
+    const dw1 = w1/srcW*W;
+    g.drawImage(im, sx, sy, w1, srcH, 0, 0, dw1, H);
+    g.drawImage(im, 0, sy, srcW - w1, srcH, dw1, 0, W - dw1, H);
   }
-};
+  g.globalAlpha = 1;
+}
 
 // cœurs en image (fournis dans docs/Vie) avec repli sur les ♥ texte
 const HEART = {ok:false, src:'Vie/coeur.webp', offSrc:'Vie/coeur-vide.webp'};
@@ -1697,7 +1617,6 @@ function floatAt(m, txt, cls){
 
 // ---------------- déroulement ----------------
 function resetRun(){
-  M3D.clear();
   game.monsters.forEach(m => m.voice.dispose());
   game.monsters.length = 0;
   game.score = 0; game.kills = 0; game.wave = 0;
@@ -2074,13 +1993,10 @@ function sim(dt){
   }
   if(game.state==='tuto') tutoUpdate(dt);
   for(const m of game.monsters) m.update(dt);
-  // purge des cadavres (les zombies 3D jouent leur animation de mort)
+  // purge des cadavres
   for(let i=game.monsters.length-1;i>=0;i--){
     const m = game.monsters[i];
-    if(m.dead && m.deadT > (m.rig ? 1.8 : 0.5)){
-      M3D.detach(m);
-      game.monsters.splice(i,1);
-    }
+    if(m.dead && m.deadT>0.5) game.monsters.splice(i,1);
   }
   if(game.state==='playing'){
     if(game.cleared){
@@ -2164,6 +2080,9 @@ function render(light){
   const el = game.effLight;
   const f = (H/2)/Math.tan(31*D2R);
 
+  // décor 360° qui tourne avec la visée, révélé par la lumière
+  drawPano(el);
+
   // halo de ta lampe
   if(el>0.02){
     let gr = g.createRadialGradient(W/2, H*0.88, 10, W/2, H*0.88, H*(0.3+0.8*el));
@@ -2211,8 +2130,7 @@ function render(light){
     g.globalAlpha = 1;
   }
 
-  // monstres (du plus loin au plus proche ; les zombies 3D via Three.js)
-  if(M3D.on && M3D.frame(rdtG)) g.drawImage(M3D.cv, 0, 0, W, H);
+  // monstres (du plus loin au plus proche)
   const sorted = game.monsters.slice().sort((a,b)=>b.dist-a.dist);
   for(const m of sorted) drawMonster(m);
 
@@ -2370,12 +2288,6 @@ function drawMonster(m){
     g.stroke();
     g.beginPath(); g.ellipse(0, h+0.08, 0.24, 0.2, 0, 0, TAU); g.fill();
     g.beginPath(); g.arc(0, h-0.12, 0.13, 0, TAU); g.fill();
-  }else if(m.type==='walker' && m.rig){
-    // corps rendu en 3D par Three.js : on ne dessine ici que le halo téléporteur
-    if(tpWarn){
-      g.fillStyle = 'rgba(150,70,220,0.32)';
-      g.beginPath(); g.ellipse(0, 0.95, 0.55, 1.05, 0, 0, TAU); g.fill();
-    }
   }else if(m.type==='walker' && SPRITES.walker.ok){
     // zombie illustré, assombri selon la lumière qu'il reçoit
     const S = SPRITES.walker;
@@ -2625,7 +2537,6 @@ function frame(ts){
 
   const light = lightLevel();
   game.effLight = clamp(light + flash*(reducedFlash?0.7:1.5) + 0.09, 0, 1.25);
-  M3D.simDt = (game.state==='playing'||game.state==='tuto'||game.state==='dying') ? dt : 0;
 
   if(game.state==='playing' || game.state==='tuto' || game.state==='dying') sim(dt);
   audioFrame();
@@ -2682,7 +2593,6 @@ const PAGES_LINK = '<br><a href="'+PAGES_URL+'">&#10132; Ouvrir la version «&nb
 
 function begin(mode){
   AU.init(); AU.resume();
-  M3D.boot();
   wakeLock();
   if(Input.gyroActive){ launch(mode); return; }
   pendingMode = mode;

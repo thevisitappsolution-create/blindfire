@@ -6,3 +6,5 @@
 /Vie/
 # documents de conception privés — ne jamais publier dans ce dépôt public
 /PRD_*.md
+# source du décor (compressé dans docs/decors/)
+/decor*.png
